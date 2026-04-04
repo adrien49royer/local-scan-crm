@@ -742,6 +742,7 @@ async function loadClients() {
       <div style="font-size:12px;color:var(--muted)">Score GMB actuel</div>
       <div class="client-actions">
         <button class="btn btn-sm" onclick="notify('Rapport mensuel en cours...')">Rapport mensuel</button>
+        <button class="btn btn-sm btn-accent" onclick="openAuditModal('${c.id}')">Audit GMB</button>
         ${!c.google_access_token?`<button class="btn btn-sm btn-accent" onclick="connectGMB('"'+c.id+'"')">Connecter GMB</button>`:'<span style="font-size:11px;color:var(--accent)">✓ GMB connecté</span>'}
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px">Client depuis ${new Date(c.created_at).toLocaleDateString('fr-FR')}</div>
@@ -815,6 +816,131 @@ function copyToClipboard(text){navigator.clipboard.writeText(text).then(()=>noti
 document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});});
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 checkSession();
+
+async function runRealAudit(clientId){
+  const{data:client}=await db.from('clients').select('*').eq('id',clientId).single();
+  if(!client?.google_access_token){notify('GMB non connecté',true);return null;}
+  const tok=client.google_access_token,acct=client.gmb_account_id;
+  if(!acct){notify('Compte GMB introuvable',true);return null;}
+  try{
+    const lr=await fetch('https://mybusinessbusinessinformation.googleapis.com/v1/'+acct+'/locations?readMask=name,title,phoneNumbers,websiteUri,regularHours,categories,profile,metadata,storefrontAddress,openInfo,labels',{headers:{'Authorization':'Bearer '+tok}});
+    const ld=await lr.json();
+    const loc=ld.locations?.[0];
+    if(!loc){notify('Aucune fiche trouvée',true);return null;}
+    const rr=await fetch('https://mybusiness.googleapis.com/v4/'+loc.name+'/reviews?pageSize=50',{headers:{'Authorization':'Bearer '+tok}});
+    const rd=await rr.json();
+    const reviews=rd.reviews||[];
+    const mr=await fetch('https://mybusiness.googleapis.com/v4/'+loc.name+'/media?pageSize=100',{headers:{'Authorization':'Bearer '+tok}});
+    const md=await mr.json();
+    const photos=md.mediaItems||[];
+    const criteria=computeAuditScore(loc,reviews,photos);
+    const score=Math.round(criteria.reduce((s,c)=>s+c.score,0)/criteria.reduce((s,c)=>s+c.max,0)*100);
+    await db.from('clients').update({audit_score:score,audit_details:JSON.stringify({criteria,reviewed_at:new Date().toISOString()}),updated_at:new Date()}).eq('id',clientId);
+    await db.from('activities').insert({prospect_id:client.prospect_id,user_id:currentUser.id,type:'audit',content:'Audit GMB '+score+'/100 — '+criteria.filter(c=>c.score<c.max).length+' points à corriger'});
+    return{score,criteria,loc,reviews,photos,tok};
+  }catch(e){notify('Erreur API GMB: '+e.message,true);return null;}
+}
+function computeAuditScore(loc,reviews,photos){
+  const unans=reviews.filter(r=>!r.reviewReply).length;
+  const avg=reviews.length?reviews.reduce((s,r)=>s+({'ONE':1,'TWO':2,'THREE':3,'FOUR':4,'FIVE':5}[r.starRating]||3),0)/reviews.length:0;
+  const hrs=loc.regularHours?.periods||[];
+  const cats=loc.categories?.additionalCategories||[];
+  return[
+    {label:'Nom renseigné',score:loc.title?5:0,max:5,ok:!!loc.title,tip:'Vérifier que le nom est exact'},
+    {label:'Adresse complète',score:loc.storefrontAddress?5:0,max:5,ok:!!loc.storefrontAddress,tip:'Compléter l\'adresse'},
+    {label:'Téléphone',score:loc.phoneNumbers?.primaryPhone?5:0,max:5,ok:!!loc.phoneNumbers?.primaryPhone,tip:'Ajouter un numéro'},
+    {label:'Site web',score:loc.websiteUri?5:0,max:5,ok:!!loc.websiteUri,tip:'Ajouter l\'URL du site'},
+    {label:'Horaires (5j+)',score:hrs.length>=5?5:hrs.length>0?3:0,max:5,ok:hrs.length>=5,tip:'Renseigner les horaires complets'},
+    {label:'Catégorie principale',score:loc.categories?.primaryCategory?5:0,max:5,ok:!!loc.categories?.primaryCategory,tip:'Vérifier la catégorie'},
+    {label:'Catégories secondaires',score:cats.length>=2?5:cats.length===1?3:0,max:5,ok:cats.length>=2,tip:'Ajouter 2+ catégories secondaires'},
+    {label:'Description 100+ chars',score:(loc.profile?.description?.length||0)>100?10:(loc.profile?.description?.length||0)>0?5:0,max:10,ok:(loc.profile?.description?.length||0)>100,tip:'Écrire une description avec mots-clés'},
+    {label:'Note ≥ 4.0',score:avg>=4.5?10:avg>=4.0?7:avg>=3.5?4:avg>0?2:0,max:10,ok:avg>=4.0,tip:'Encourager les avis positifs'},
+    {label:'Volume avis (50+)',score:reviews.length>=100?10:reviews.length>=50?7:reviews.length>=20?4:reviews.length>=5?2:0,max:10,ok:reviews.length>=50,tip:'Stratégie de collecte d\'avis'},
+    {label:'Réponses aux avis',score:unans===0?10:unans<=3?6:unans<=10?3:0,max:10,ok:unans===0,tip:unans+' avis sans réponse'},
+    {label:'Photos (10+)',score:photos.length>=20?5:photos.length>=10?3:photos.length>=3?1:0,max:5,ok:photos.length>=10,tip:'Ajouter photos façade/intérieur/produits'},
+    {label:'Fiche ouverte',score:loc.openInfo?.status==='OPEN'?5:0,max:5,ok:loc.openInfo?.status==='OPEN',tip:'Vérifier que la fiche est active'},
+    {label:'Attributs/labels',score:(loc.labels?.length||0)>0?5:0,max:5,ok:(loc.labels?.length||0)>0,tip:'Ajouter attributs (accessibilité, paiements...)'},
+  ];
+}
+async function openAuditModal(clientId){
+  notify('Audit en cours...');
+  const res=await runRealAudit(clientId);
+  if(!res)return;
+  const{score,criteria,reviews}=res;
+  const unans=reviews.filter(r=>!r.reviewReply);
+  const ko=criteria.filter(c=>c.score<c.max);
+  const col=score>=70?'var(--accent)':score>=45?'#EF9F27':'var(--warn)';
+  let html='<div style="display:flex;align-items:center;gap:16px;margin-bottom:1.5rem"><div style="font-size:52px;font-weight:500;color:'+col+'">'+score+'<span style="font-size:16px;color:var(--muted)">/100</span></div><div><div style="font-weight:500">'+(score>=70?'Bien optimisée':score>=45?'À améliorer':'Critique')+'</div><div style="font-size:12px;color:var(--muted)">'+ko.length+' critère(s) à corriger</div></div></div>';
+  html+='<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:1rem">';
+  criteria.forEach(c=>{
+    html+='<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:'+(c.ok?'#EAF3DE':'#FCEBEB')+';border-radius:7px"><span>'+(c.ok?'\u2713':'\u2717')+'</span><div style="flex:1"><div style="font-size:12px;font-weight:500">'+c.label+'</div>'+(!c.ok?'<div style="font-size:11px;color:#666">→ '+c.tip+'</div>':'')+'</div><span style="font-family:monospace;font-size:11px">'+c.score+'/'+c.max+'</span></div>';
+  });
+  html+='</div>';
+  if(unans.length>0){
+    html+='<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:1rem 0 .5rem">'+unans.length+' AVIS SANS RÉPONSE</div>';
+    unans.slice(0,3).forEach(r=>{
+      const rid=r.reviewId,rt=(r.comment||'').substring(0,100).replace(/"/g,'&quot;');
+      html+='<div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:6px"><div style="font-size:11px;color:var(--muted)">'+( r.reviewer?.displayName||'Anonyme')+' · '+r.starRating+'</div><div style="font-size:12px;margin:4px 0">'+(r.comment||'').substring(0,120)+'</div><button class="btn btn-sm btn-accent" onclick="genReply(\"'+clientId+'\",\"'+rid+'\",this,\"'+rt+'\")">« Réponse IA</button></div>';
+    });
+  }
+  html+='<button class="btn btn-sm" style="margin-top:.75rem" onclick="genDescImprovement(\"'+clientId+'\")">✏️ Améliorer description</button>';
+  document.getElementById('audit-modal-body').innerHTML=html;
+  document.getElementById('modal-audit').classList.add('open');
+}
+async function genReply(clientId,reviewId,btn,reviewText){
+  btn.textContent='...';btn.disabled=true;
+  const{data:cl}=await db.from('clients').select('name').eq('id',clientId).single();
+  const prompt='Tu es gérant de "'+cl.name+'". Réponse professionnelle (3-4 phrases) à: "'+reviewText+'". Juste la réponse.';
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:prompt}]})});
+  const data=await resp.json();
+  const reply=data.content?.[0]?.text||'';
+  btn.insertAdjacentHTML('afterend','<textarea style="width:100%;margin-top:6px;font-size:12px;padding:8px;border:1px solid var(--border-strong);border-radius:6px" rows="3">'+reply+'</textarea><button class="btn btn-sm btn-primary" style="margin-top:4px" onclick="publishReply(\"'+clientId+'\",\"'+reviewId+'\",this)">Publier</button>');
+  btn.remove();
+}
+async function publishReply(clientId,reviewId,btn){
+  const ta=btn.previousElementSibling;
+  const{data:cl}=await db.from('clients').select('google_access_token,gmb_account_id').eq('id',clientId).single();
+  btn.textContent='...';btn.disabled=true;
+  const lr=await fetch('https://mybusinessbusinessinformation.googleapis.com/v1/'+cl.gmb_account_id+'/locations?readMask=name',{headers:{'Authorization':'Bearer '+cl.google_access_token}});
+  const ld=await lr.json();
+  const ln=ld.locations?.[0]?.name;
+  if(ln){const r=await fetch('https://mybusiness.googleapis.com/v4/'+ln+'/reviews/'+reviewId+'/reply',{method:'PUT',headers:{'Authorization':'Bearer '+cl.google_access_token,'Content-Type':'application/json'},body:JSON.stringify({comment:ta.value})});r.ok?notify('Réponse publiée ✓'):notify('Erreur',true);}
+  btn.disabled=false;btn.textContent='Publier';
+}
+async function genDescImprovement(clientId){
+  const{data:cl}=await db.from('clients').select('name,category').eq('id',clientId).single();
+  const prompt='Description GMB pour "'+cl.name+'" à Angers. 250 chars max, mots-clés locaux. Juste la description.';
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:200,messages:[{role:'user',content:prompt}]})});
+  const data=await resp.json();
+  const desc=data.content?.[0]?.text||'';
+  document.getElementById('audit-modal-body').insertAdjacentHTML('beforeend','<div style="margin-top:1rem;background:var(--bg);border-radius:8px;padding:12px"><div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">DESCRIPTION SUGGÉRÉE</div><textarea id="desc-ta" style="width:100%;font-size:12px;padding:8px;border:1px solid var(--border-strong);border-radius:6px" rows="3">'+desc+'</textarea><button class="btn btn-sm btn-primary" style="margin-top:6px" onclick="publishDesc(\"'+clientId+'\",this)">Appliquer sur GMB</button></div>');
+}
+async function publishDesc(clientId,btn){
+  const ta=document.getElementById('desc-ta');
+  const{data:cl}=await db.from('clients').select('google_access_token,gmb_account_id').eq('id',clientId).single();
+  btn.textContent='...';btn.disabled=true;
+  const lr=await fetch('https://mybusinessbusinessinformation.googleapis.com/v1/'+cl.gmb_account_id+'/locations?readMask=name',{headers:{'Authorization':'Bearer '+cl.google_access_token}});
+  const ld=await lr.json();
+  const ln=ld.locations?.[0]?.name;
+  if(ln){const r=await fetch('https://mybusinessbusinessinformation.googleapis.com/v1/'+ln+'?updateMask=profile.description',{method:'PATCH',headers:{'Authorization':'Bearer '+cl.google_access_token,'Content-Type':'application/json'},body:JSON.stringify({profile:{description:ta.value}})});r.ok?notify('Description mise à jour ✓'):notify('Erreur',true);}
+  btn.disabled=false;btn.textContent='Appliquer sur GMB';
+}
 </script>
+
+<div class="modal-bg" id="modal-audit">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div>
+    <div class="modal-body" id="audit-modal-body" style="max-height:70vh;overflow-y:auto"></div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-audit">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div>
+    <div class="modal-body" id="audit-modal-body" style="max-height:65vh;overflow-y:auto"></div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button></div>
+  </div>
+</div>
 </body>
 </html>
