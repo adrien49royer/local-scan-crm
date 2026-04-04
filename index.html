@@ -857,9 +857,9 @@ async function runPublicAudit(prospectId) {
   
   const criteria=[
     {label:'Nom renseigné',cat:'Infos de base',score:details.name||p.name?5:0,max:5,ok:!!(details.name||p.name),tip:'Le nom doit être exact et complet'},
-    {label:'Adresse complète',cat:'Infos de base',score:details.formatted_address||p.address?5:0,max:5,ok:!!(details.formatted_address||p.address),tip:'Vérifier et compléter l'adresse'},
-    {label:'Numéro de téléphone',cat:'Infos de base',score:hasPhone?5:0,max:5,ok:hasPhone,tip:'Ajouter un numéro de téléphone local'},
-    {label:'Site web',cat:'Infos de base',score:hasWebsite?5:0,max:5,ok:hasWebsite,tip:'Ajouter l'URL du site web'},
+    {label:'Adresse complète',cat:'Infos de base',score:details.formatted_address||p.address?5:0,max:5,ok:!!(details.formatted_address||p.address),tip:'Vérifier et compléter l\'adresse'},
+    {label:'Numéro de téléphone',cat:'Infos de base',score:hasPhone?5:0,max:5,ok:hasPhone,tip:'Ajouter un numéro de téléphone local\'},
+    {label:'Site web',cat:'Infos de base',score:hasWebsite?5:0,max:5,ok:hasWebsite,tip:'Ajouter l\'URL du site web'},
     {label:'Horaires renseignés',cat:'Complétude',score:hoursCount>=5?5:hoursCount>0?3:0,max:5,ok:hoursCount>=5,tip:'Renseigner les horaires pour tous les jours ouverts'},
     {label:'Horaires spéciaux (fériés)',cat:'Complétude',score:details.opening_hours?.special_hours?.length?5:0,max:5,ok:!!details.opening_hours?.special_hours?.length,tip:'Ajouter les horaires exceptionnels (jours fériés, vacances)'},
     {label:'Catégorie principale',cat:'Complétude',score:types.length>0?5:0,max:5,ok:types.length>0,tip:'Vérifier et optimiser la catégorie principale'},
