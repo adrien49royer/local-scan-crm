@@ -1,1 +1,817 @@
-<html><body><h1>CRM Local Scan - En cours de déploiement</h1></body></html>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Local Scan CRM</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F8F6F1;--surface:#fff;--text:#1C1C1A;--muted:#7A7870;
+  --accent:#1D9E75;--accent-dark:#0F6E56;--warn:#E24B4A;
+  --border:rgba(0,0,0,.08);--border-strong:rgba(0,0,0,.15);
+  --radius:12px;--sans:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',monospace;
+  --urgent-bg:#FCEBEB;--urgent-fg:#A32D2D;
+  --hot-bg:#FFF3E0;--hot-fg:#854F0B;
+  --warm-bg:#FFFDE7;--warm-fg:#666600;
+}
+html{height:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100%;line-height:1.5}
+
+/* ── AUTH ── */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+.auth-card{background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);padding:2.5rem;width:400px;text-align:center}
+.auth-logo{font-family:var(--mono);font-size:13px;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5rem}
+.auth-title{font-size:1.5rem;font-weight:500;margin-bottom:.4rem}
+.auth-sub{font-size:14px;color:var(--muted);margin-bottom:2rem}
+.auth-form{display:flex;flex-direction:column;gap:10px;text-align:left}
+.auth-label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:5px}
+.auth-input{width:100%;padding:11px 14px;border:1px solid var(--border-strong);border-radius:8px;font-size:14px;font-family:var(--sans);background:var(--bg);color:var(--text);outline:none;transition:border-color .2s}
+.auth-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(29,158,117,.1)}
+.auth-btn{width:100%;padding:13px;background:var(--text);color:#fff;border:none;border-radius:8px;font-size:14px;font-family:var(--sans);font-weight:500;cursor:pointer;transition:background .2s;margin-top:4px}
+.auth-btn:hover{background:#2d2d2b}
+.auth-err{font-size:12px;color:var(--warn);text-align:center;min-height:18px}
+
+/* ── LAYOUT ── */
+#app{display:none;height:100vh;flex-direction:column}
+.topbar{background:#1C1C1A;color:#fff;padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:52px;flex-shrink:0}
+.topbar-logo{font-family:var(--mono);font-size:12px;letter-spacing:.14em;color:rgba(255,255,255,.5)}
+.topbar-nav{display:flex;gap:2px}
+.nav-btn{font-size:13px;padding:6px 14px;border-radius:7px;cursor:pointer;color:rgba(255,255,255,.55);border:none;background:none;font-family:var(--sans);transition:all .15s}
+.nav-btn:hover{color:#fff;background:rgba(255,255,255,.08)}
+.nav-btn.active{color:#fff;background:rgba(29,158,117,.25)}
+.topbar-user{display:flex;align-items:center;gap:10px}
+.user-pill{font-size:12px;color:rgba(255,255,255,.5);font-family:var(--mono)}
+.logout-btn{font-size:11px;padding:4px 10px;border:1px solid rgba(255,255,255,.15);border-radius:5px;cursor:pointer;color:rgba(255,255,255,.4);background:none;font-family:var(--sans)}
+.logout-btn:hover{color:#fff;border-color:rgba(255,255,255,.3)}
+
+.main{flex:1;overflow:auto;padding:1.5rem}
+
+/* ── PAGES ── */
+.page{display:none}.page.active{display:block}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:1.5rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem}
+.stat-label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);margin-bottom:4px}
+.stat-val{font-size:24px;font-weight:500}
+.stat-val.green{color:var(--accent-dark)}
+.stat-val.amber{color:#854F0B}
+.stat-val.red{color:var(--warn)}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap}
+.toolbar-title{font-size:16px;font-weight:500;flex:1}
+input[type=text],input[type=email],input[type=password],select,textarea{padding:9px 12px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px;font-family:var(--sans);background:var(--bg);color:var(--text);outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.search-input{width:260px}
+.btn{padding:8px 16px;border:1px solid var(--border-strong);border-radius:8px;font-size:13px;font-family:var(--sans);cursor:pointer;background:var(--surface);color:var(--text);transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-primary:hover{background:#2d2d2b}
+.btn-accent{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-accent:hover{background:var(--accent-dark)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-danger{background:var(--warn);color:#fff;border-color:var(--warn)}
+
+/* ── TABLE ── */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg);padding:9px 14px;text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border);font-weight:400}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg)}
+.badge{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px;font-weight:400}
+.badge-urgent{background:var(--urgent-bg);color:var(--urgent-fg)}
+.badge-chaud{background:var(--hot-bg);color:var(--hot-fg)}
+.badge-tiede{background:var(--warm-bg);color:var(--warm-fg)}
+.badge-ok{background:#EAF3DE;color:#3B6D11}
+.badge-blue{background:#E6F1FB;color:#0C447C}
+.badge-green{background:#EAF3DE;color:#3B6D11}
+.badge-gray{background:#F1EFE8;color:#5F5E5A}
+
+/* ── PIPELINE KANBAN ── */
+.kanban{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;align-items:start}
+.kanban-col{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.kanban-head{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.kanban-title{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--muted)}
+.kanban-count{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text)}
+.kanban-body{padding:8px;display:flex;flex-direction:column;gap:6px;min-height:80px}
+.k-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;transition:border-color .15s}
+.k-card:hover{border-color:var(--accent)}
+.k-name{font-size:12px;font-weight:500;margin-bottom:3px;color:var(--text)}
+.k-meta{font-size:11px;color:var(--muted)}
+
+/* ── MODAL ── */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius);width:100%;max-width:660px;overflow:hidden;margin:auto}
+.modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:500}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1;padding:0 4px}
+.modal-body{padding:1.5rem;display:flex;flex-direction:column;gap:1rem}
+.modal-foot{padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-field{display:flex;flex-direction:column;gap:5px}
+.form-field.full{grid-column:1/-1}
+.form-label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted)}
+.form-field input,.form-field select,.form-field textarea{width:100%}
+.form-field textarea{resize:vertical;min-height:80px}
+
+/* ── ACTIVITY ── */
+.activity-list{display:flex;flex-direction:column;gap:8px}
+.act-item{display:flex;gap:10px;padding:10px 12px;background:var(--bg);border-radius:8px}
+.act-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.act-dot-green{background:var(--accent)}
+.act-dot-blue{background:#378ADD}
+.act-dot-amber{background:#EF9F27}
+.act-dot-red{background:var(--warn)}
+.act-content{flex:1}
+.act-text{font-size:13px;color:var(--text)}
+.act-time{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── SCRAPING ── */
+.scrape-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;margin-bottom:1.5rem}
+.scrape-title{font-size:14px;font-weight:500;margin-bottom:1rem}
+.scrape-form{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.scrape-progress{background:var(--bg);border-radius:8px;padding:1rem;margin-top:1rem;display:none}
+.progress-bar-wrap{background:var(--border);border-radius:4px;height:6px;margin:.5rem 0}
+.progress-bar{background:var(--accent);height:6px;border-radius:4px;transition:width .4s}
+.progress-log{font-family:var(--mono);font-size:11px;color:var(--muted);max-height:120px;overflow-y:auto}
+
+/* ── NOTIFICATION ── */
+.notif{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--text);color:#fff;padding:12px 18px;border-radius:9px;font-size:13px;z-index:999;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none}
+.notif.show{opacity:1;transform:translateY(0)}
+
+/* ── LOADING ── */
+.loading-spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SCORE RING (mini) ── */
+.score-mini{display:inline-flex;align-items:center;gap:6px}
+.score-circle{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:500}
+.score-hi{background:var(--urgent-bg);color:var(--urgent-fg)}
+.score-md{background:var(--hot-bg);color:var(--hot-fg)}
+.score-lo{background:#EAF3DE;color:#3B6D11}
+
+/* ── CLIENTS ── */
+.client-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.client-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+.client-name{font-size:14px;font-weight:500;margin-bottom:4px}
+.client-cat{font-size:12px;color:var(--muted)}
+.client-score{font-size:28px;font-weight:500;color:var(--accent);margin:.75rem 0 .25rem}
+.client-actions{display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap}
+
+@media(max-width:768px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .kanban{grid-template-columns:1fr}
+  .client-grid{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ AUTH ═══════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">LOCAL SCAN · CRM</div>
+    <h1 class="auth-title">Accès réservé</h1>
+    <p class="auth-sub">Équipe AVANTI uniquement</p>
+    <div class="auth-form">
+      <div>
+        <label class="auth-label">EMAIL</label>
+        <input class="auth-input" type="email" id="login-email" placeholder="adrien@avanti-agence.fr" />
+      </div>
+      <div>
+        <label class="auth-label">MOT DE PASSE</label>
+        <input class="auth-input" type="password" id="login-pass" placeholder="••••••••" />
+      </div>
+      <div class="auth-err" id="auth-err"></div>
+      <button class="auth-btn" id="login-btn" onclick="login()">Se connecter →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ APP ═══════════════ -->
+<div id="app">
+  <div class="topbar">
+    <span class="topbar-logo">LOCAL SCAN</span>
+    <div class="topbar-nav">
+      <button class="nav-btn active" onclick="showPage('dashboard')">Dashboard</button>
+      <button class="nav-btn" onclick="showPage('prospects')">Prospects</button>
+      <button class="nav-btn" onclick="showPage('pipeline')">Pipeline</button>
+      <button class="nav-btn" onclick="showPage('clients')">Clients</button>
+      <button class="nav-btn" onclick="showPage('scraping')">Scraping</button>
+    </div>
+    <div class="topbar-user">
+      <span class="user-pill" id="user-pill">—</span>
+      <button class="logout-btn" onclick="logout()">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-label">PROSPECTS</div><div class="stat-val" id="st-prospects">—</div></div>
+        <div class="stat-card"><div class="stat-label">URGENTS</div><div class="stat-val red" id="st-urgent">—</div></div>
+        <div class="stat-card"><div class="stat-label">EN COURS</div><div class="stat-val amber" id="st-pipeline">—</div></div>
+        <div class="stat-card"><div class="stat-label">CLIENTS ACTIFS</div><div class="stat-val green" id="st-clients">—</div></div>
+        <div class="stat-card"><div class="stat-label">SIGNÉS CE MOIS</div><div class="stat-val green" id="st-signed">—</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="table-wrap">
+          <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.08em">PROSPECTS PRIORITAIRES</div>
+          <table><thead><tr><th>Commerce</th><th>Catégorie</th><th>Score</th><th>Action</th></tr></thead>
+          <tbody id="dash-prospects"></tbody></table>
+        </div>
+        <div class="table-wrap">
+          <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.08em">ACTIVITÉ RÉCENTE</div>
+          <div style="padding:12px" id="dash-activity"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROSPECTS -->
+    <div class="page" id="page-prospects">
+      <div class="toolbar">
+        <span class="toolbar-title">Prospects</span>
+        <input class="search-input" type="text" placeholder="Rechercher..." id="search-prospects" oninput="filterProspects()">
+        <select id="filter-stage" onchange="filterProspects()">
+          <option value="">Tous les stades</option>
+          <option value="to_contact">À contacter</option>
+          <option value="contacted">Contacté</option>
+          <option value="demo">Démo/RDV</option>
+          <option value="negotiation">Négociation</option>
+          <option value="signed">Signé</option>
+          <option value="lost">Perdu</option>
+        </select>
+        <select id="filter-priority" onchange="filterProspects()">
+          <option value="">Toutes priorités</option>
+          <option value="URGENT">Urgent</option>
+          <option value="CHAUD">Chaud</option>
+          <option value="TIEDE">Tiède</option>
+          <option value="OK">OK</option>
+        </select>
+        <button class="btn btn-accent" onclick="openProspectModal()">+ Ajouter</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Commerce</th><th>Catégorie</th><th>Note</th><th>Avis</th><th>Priorité</th><th>Stade</th><th>Assigné</th><th>Score</th><th></th></tr></thead>
+          <tbody id="prospects-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="page" id="page-pipeline">
+      <div class="toolbar">
+        <span class="toolbar-title">Pipeline commercial</span>
+      </div>
+      <div class="kanban" id="kanban-board"></div>
+    </div>
+
+    <!-- CLIENTS -->
+    <div class="page" id="page-clients">
+      <div class="toolbar">
+        <span class="toolbar-title">Clients actifs</span>
+      </div>
+      <div class="client-grid" id="clients-grid"></div>
+    </div>
+
+    <!-- SCRAPING -->
+    <div class="page" id="page-scraping">
+      <div class="scrape-box">
+        <div class="scrape-title">Lancer une campagne de scraping</div>
+        <div class="scrape-form">
+          <div>
+            <label class="form-label" style="display:block;margin-bottom:5px">VILLE / COMMUNE</label>
+            <input type="text" id="scrape-city" placeholder="ex: Angers" style="width:200px">
+          </div>
+          <div>
+            <label class="form-label" style="display:block;margin-bottom:5px">RAYON (km)</label>
+            <select id="scrape-radius" style="width:100px">
+              <option value="1">1 km</option>
+              <option value="2">2 km</option>
+              <option value="3" selected>3 km</option>
+              <option value="5">5 km</option>
+              <option value="10">10 km</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="display:block;margin-bottom:5px">CLÉ API GOOGLE</label>
+            <input type="password" id="scrape-apikey" placeholder="AIza..." style="width:220px" value="">
+          </div>
+          <button class="btn btn-accent" onclick="launchScraping()" id="scrape-btn">Lancer le scraping →</button>
+        </div>
+        <div class="scrape-progress" id="scrape-progress">
+          <div style="font-size:13px;font-weight:500;margin-bottom:6px" id="scrape-status">Préparation...</div>
+          <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+          <div class="progress-log" id="progress-log"></div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <span class="toolbar-title">Campagnes</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Campagne</th><th>Ville</th><th>Rayon</th><th>Statut</th><th>Prospects</th><th>Date</th></tr></thead>
+          <tbody id="campaigns-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════════════ MODALS ═══════════════ -->
+
+<!-- Modal prospect -->
+<div class="modal-bg" id="modal-prospect">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="modal-prospect-title">Prospect</span>
+      <button class="modal-close" onclick="closeModal('modal-prospect')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full"><label class="form-label">NOM DU COMMERCE</label><input type="text" id="p-name"></div>
+        <div class="form-field"><label class="form-label">CATÉGORIE</label>
+          <select id="p-cat">
+            <option value="restaurant">Restaurant</option><option value="hair_care">Coiffeur</option>
+            <option value="bakery">Boulangerie</option><option value="plumber">Plombier</option>
+            <option value="electrician">Électricien</option><option value="car_repair">Garage</option>
+            <option value="florist">Fleuriste</option><option value="laundry">Pressing</option>
+            <option value="bar">Bar</option><option value="beauty_salon">Institut beauté</option>
+            <option value="other">Autre</option>
+          </select>
+        </div>
+        <div class="form-field"><label class="form-label">TÉLÉPHONE</label><input type="text" id="p-phone"></div>
+        <div class="form-field full"><label class="form-label">ADRESSE</label><input type="text" id="p-address"></div>
+        <div class="form-field"><label class="form-label">SITE WEB</label><input type="text" id="p-website"></div>
+        <div class="form-field"><label class="form-label">NOTE GOOGLE</label><input type="number" id="p-rating" min="0" max="5" step="0.1"></div>
+        <div class="form-field"><label class="form-label">NB AVIS</label><input type="number" id="p-reviews"></div>
+        <div class="form-field"><label class="form-label">STADE</label>
+          <select id="p-stage">
+            <option value="to_contact">À contacter</option><option value="contacted">Contacté</option>
+            <option value="demo">Démo/RDV</option><option value="negotiation">Négociation</option>
+            <option value="signed">Signé</option><option value="lost">Perdu</option>
+          </select>
+        </div>
+        <div class="form-field full"><label class="form-label">NOTES INTERNES</label><textarea id="p-notes"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('modal-prospect')">Annuler</button>
+      <button class="btn btn-accent" onclick="saveProspect()" id="save-prospect-btn">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal fiche prospect -->
+<div class="modal-bg" id="modal-fiche">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-head">
+      <span class="modal-title" id="fiche-title">—</span>
+      <button class="modal-close" onclick="closeModal('modal-fiche')">×</button>
+    </div>
+    <div class="modal-body" id="fiche-body" style="gap:.75rem"></div>
+    <div class="modal-foot">
+      <button class="btn btn-sm" onclick="generateAudit()" id="audit-btn">Générer l'audit GMB</button>
+      <button class="btn btn-sm btn-accent" onclick="generateOffer()" id="offer-btn">Générer l'offre</button>
+      <button class="btn btn-sm btn-primary" onclick="moveToSigned()" id="sign-btn">Marquer comme Signé</button>
+      <button class="btn btn-sm" onclick="closeModal('modal-fiche')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notification -->
+<div class="notif" id="notif"></div>
+
+<script>
+const SUPABASE_URL = 'https://cnmupogtzorsqkwjmocx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_MOaPEokptKk3jo7FiY5G7w_wNx507ON';
+const PROXY = 'https://gmaps-proxy.adrien49-royer.workers.dev/?url=';
+const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const STAGES = {
+  to_contact:'À contacter', contacted:'Contacté',
+  demo:'Démo/RDV', negotiation:'Négociation',
+  signed:'Signé', lost:'Perdu'
+};
+const CATS = {
+  restaurant:'Restaurant', hair_care:'Coiffeur', bakery:'Boulangerie',
+  plumber:'Plombier', electrician:'Électricien', car_repair:'Garage',
+  florist:'Fleuriste', laundry:'Pressing', bar:'Bar',
+  beauty_salon:'Institut beauté', other:'Autre'
+};
+const PRIORITY_BADGE = {
+  URGENT:'badge-urgent', CHAUD:'badge-chaud',
+  TIEDE:'badge-tiede warm', OK:'badge-ok'
+};
+const STAGE_BADGE = {
+  to_contact:'badge-gray', contacted:'badge-blue',
+  demo:'badge-blue', negotiation:'badge-amber',
+  signed:'badge-green', lost:'badge-urgent'
+};
+
+let currentUser = null;
+let allProspects = [];
+let currentProspectId = null;
+
+async function login() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  document.getElementById('auth-err').textContent = '';
+  document.getElementById('login-btn').textContent = 'Connexion...';
+  const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
+  if (error) {
+    document.getElementById('auth-err').textContent = 'Email ou mot de passe incorrect';
+    document.getElementById('login-btn').textContent = 'Se connecter →';
+    return;
+  }
+  currentUser = data.user;
+  showApp();
+}
+
+async function logout() {
+  await db.auth.signOut();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  currentUser = null;
+}
+
+async function checkSession() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) { currentUser = session.user; showApp(); }
+}
+
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('user-pill').textContent = currentUser.email.split('@')[0];
+  loadDashboard();
+  loadProspects();
+  loadCampaigns();
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'pipeline') renderKanban();
+  if (name === 'clients') loadClients();
+}
+
+async function loadDashboard() {
+  const { data: prospects } = await db.from('prospects').select('*');
+  const { data: clients } = await db.from('clients').select('*').eq('status', 'active');
+  allProspects = prospects || [];
+  const urgent = allProspects.filter(p => p.priority_label === 'URGENT').length;
+  const inPipe = allProspects.filter(p => ['contacted','demo','negotiation'].includes(p.pipeline_stage)).length;
+  const thisMonth = allProspects.filter(p => {
+    if (p.pipeline_stage !== 'signed') return false;
+    const d = new Date(p.updated_at);
+    const now = new Date();
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+  document.getElementById('st-prospects').textContent = allProspects.length;
+  document.getElementById('st-urgent').textContent = urgent;
+  document.getElementById('st-pipeline').textContent = inPipe;
+  document.getElementById('st-clients').textContent = (clients || []).length;
+  document.getElementById('st-signed').textContent = thisMonth;
+  const top = [...allProspects].sort((a,b) => b.priority_score - a.priority_score).slice(0,8);
+  document.getElementById('dash-prospects').innerHTML = top.map(p => `
+    <tr onclick="openFiche('${p.id}')" style="cursor:pointer">
+      <td><strong>${p.name}</strong></td>
+      <td>${CATS[p.category]||p.category||'—'}</td>
+      <td><span class="badge ${PRIORITY_BADGE[p.priority_label]||'badge-gray'}">${p.priority_label}</span></td>
+      <td><button class="btn btn-sm" onclick="event.stopPropagation();openFiche('${p.id}')">Voir →</button></td>
+    </tr>
+  `).join('');
+  const { data: acts } = await db.from('activities').select('*').order('created_at', {ascending:false}).limit(6);
+  const dotColor = {note:'amber',call:'blue',email:'blue',meeting:'green',stage_change:'green',audit:'amber',offer:'blue',report:'green'};
+  document.getElementById('dash-activity').innerHTML = `<div class="activity-list">${(acts||[]).map(a => `
+    <div class="act-item">
+      <div class="act-dot act-dot-${dotColor[a.type]||'blue'}"></div>
+      <div class="act-content">
+        <div class="act-text">${a.content||a.type}</div>
+        <div class="act-time">${new Date(a.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+    </div>
+  `).join('')}</div>`;
+}
+
+async function loadProspects() {
+  const { data } = await db.from('prospects').select('*').order('priority_score', {ascending:false});
+  allProspects = data || [];
+  renderProspects(allProspects);
+}
+
+function renderProspects(list) {
+  document.getElementById('prospects-tbody').innerHTML = list.map((p,i) => `
+    <tr>
+      <td style="color:var(--muted);font-family:var(--mono)">${i+1}</td>
+      <td><strong style="cursor:pointer;color:var(--accent)" onclick="openFiche('${p.id}')">${p.name}</strong></td>
+      <td>${CATS[p.category]||p.category||'—'}</td>
+      <td>${p.rating>0?p.rating+'★':'—'}</td>
+      <td>${p.review_count||0}</td>
+      <td><span class="badge ${PRIORITY_BADGE[p.priority_label]||'badge-gray'}">${p.priority_label||'OK'}</span></td>
+      <td><span class="badge ${STAGE_BADGE[p.pipeline_stage]||'badge-gray'}">${STAGES[p.pipeline_stage]||p.pipeline_stage}</span></td>
+      <td style="color:var(--muted);font-size:12px">—</td>
+      <td><div class="score-circle ${p.priority_score>=6?'score-hi':p.priority_score>=4?'score-md':'score-lo'}">${p.priority_score||0}</div></td>
+      <td><button class="btn btn-sm" onclick="openFiche('${p.id}')">Voir</button> <button class="btn btn-sm" onclick="openProspectModal('${p.id}')">Edit</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:2rem">Aucun prospect.</td></tr>';
+}
+
+function filterProspects() {
+  const q = document.getElementById('search-prospects').value.toLowerCase();
+  const stage = document.getElementById('filter-stage').value;
+  const prio = document.getElementById('filter-priority').value;
+  renderProspects(allProspects.filter(p => (!q||p.name.toLowerCase().includes(q)||(p.address||'').toLowerCase().includes(q))&&(!stage||p.pipeline_stage===stage)&&(!prio||p.priority_label===prio)));
+}
+
+function renderKanban() {
+  const stages = ['to_contact','contacted','demo','negotiation','signed','lost'];
+  document.getElementById('kanban-board').innerHTML = stages.map(stage => {
+    const cards = allProspects.filter(p => p.pipeline_stage === stage);
+    return `
+      <div class="kanban-col" style="${stage==='signed'?'border-top:3px solid var(--accent)':stage==='lost'?'border-top:3px solid var(--warn)':''}">
+        <div class="kanban-head">
+          <span class="kanban-title">${STAGES[stage].toUpperCase()}</span>
+          <span class="kanban-count">${cards.length}</span>
+        </div>
+        <div class="kanban-body">
+          ${cards.slice(0,10).map(p => `
+            <div class="k-card" onclick="openFiche('${p.id}')">
+              <div class="k-name">${p.name}</div>
+              <div class="k-meta">${CATS[p.category]||p.category||'—'} · <span class="badge ${PRIORITY_BADGE[p.priority_label]||'badge-gray'}" style="font-size:9px">${p.priority_label}</span></div>
+            </div>
+          `).join('')}
+          ${cards.length > 10 ? `<div style="font-size:11px;color:var(--muted);text-align:center;padding:4px">+${cards.length-10} autres</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openFiche(id) {
+  currentProspectId = id;
+  const p = allProspects.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('fiche-title').textContent = p.name;
+  const { data: acts } = await db.from('activities').select('*').eq('prospect_id', id).order('created_at', {ascending:false}).limit(10);
+  const dotColor = {note:'amber',call:'blue',email:'blue',meeting:'green',stage_change:'green',audit:'amber',offer:'blue',report:'green'};
+  document.getElementById('fiche-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">INFOS</div>
+        <table style="font-size:13px;width:100%">
+          <tr><td style="color:var(--muted);padding:3px 0;width:110px">Catégorie</td><td>${CATS[p.category]||p.category||'—'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Adresse</td><td>${p.address||'—'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Téléphone</td><td>${p.phone||'—'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Site web</td><td>${p.website?`<a href="${p.website}" target="_blank" style="color:var(--accent)">${p.website}</a>`:'—'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Note Google</td><td>${p.rating>0?p.rating+'★':'—'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Avis</td><td>${p.review_count||0}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Stade</td><td>
+            <select onchange="updateStage('${p.id}',this.value)" style="font-size:12px;padding:3px 6px">
+              ${Object.entries(STAGES).map(([k,v]) => `<option value="${k}" ${p.pipeline_stage===k?'selected':''}>${v}</option>`).join('')}
+            </select>
+          </td></tr>
+        </table>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">SCORE GMB</div>
+        <div style="font-size:42px;font-weight:500;color:${(p.audit_score||0)>=70?'var(--accent)':(p.audit_score||0)>=45?'#EF9F27':'var(--warn)'}">
+          ${p.audit_score!=null?p.audit_score+'<span style="font-size:16px;color:var(--muted)">/100</span>':'—'}
+        </div>
+        ${p.notes?`<div style="margin-top:10px"><div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:4px">NOTES</div><div style="font-size:13px;background:var(--bg);padding:8px 10px;border-radius:6px">${p.notes}</div></div>`:''}
+      </div>
+    </div>
+    ${p.offer_text?`<div><div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px">OFFRE GÉNÉRÉE</div><div style="font-size:12px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;max-height:160px;overflow-y:auto">${p.offer_text}</div></div>`:''}
+    <div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px">ACTIVITÉ (${(acts||[]).length})</div>
+      <div class="activity-list">${(acts||[]).length?acts.map(a=>`
+        <div class="act-item" style="padding:7px 10px">
+          <div class="act-dot act-dot-${dotColor[a.type]||'blue'}"></div>
+          <div class="act-content"><div class="act-text">${a.content||a.type}</div><div class="act-time">${new Date(a.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div>
+        </div>
+      `).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px">Aucune activité encore.</div>'}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="new-activity" placeholder="Ajouter une note..." style="flex:1">
+      <button class="btn btn-sm btn-accent" onclick="addActivity()">Ajouter</button>
+    </div>
+  `;
+  document.getElementById('sign-btn').style.display = p.pipeline_stage === 'signed' ? 'none' : '';
+  openModal('modal-fiche');
+}
+
+async function updateStage(id, stage) {
+  await db.from('prospects').update({ pipeline_stage: stage, updated_at: new Date() }).eq('id', id);
+  await db.from('activities').insert({ prospect_id: id, user_id: currentUser.id, type: 'stage_change', content: `Stade changé → ${STAGES[stage]}` });
+  const p = allProspects.find(x => x.id === id);
+  if (p) p.pipeline_stage = stage;
+  notify('Stade mis à jour');
+}
+
+async function addActivity() {
+  const txt = document.getElementById('new-activity').value.trim();
+  if (!txt || !currentProspectId) return;
+  await db.from('activities').insert({ prospect_id: currentProspectId, user_id: currentUser.id, type: 'note', content: txt });
+  document.getElementById('new-activity').value = '';
+  openFiche(currentProspectId);
+}
+
+async function moveToSigned() {
+  if (!currentProspectId) return;
+  await updateStage(currentProspectId, 'signed');
+  const p = allProspects.find(x => x.id === currentProspectId);
+  if (p) {
+    await db.from('clients').insert({ prospect_id: p.id, place_id: p.place_id, name: p.name, category: p.category, address: p.address, phone: p.phone, contract_start: new Date().toISOString().split('T')[0], status: 'active', assigned_to: currentUser.id });
+    notify('✓ Client créé !');
+  }
+  closeModal('modal-fiche');
+  loadDashboard();
+  loadProspects();
+}
+
+async function generateAudit() {
+  const p = allProspects.find(x => x.id === currentProspectId);
+  if (!p) return;
+  document.getElementById('audit-btn').innerHTML = '<span class="loading-spinner"></span>Génération...';
+  document.getElementById('audit-btn').disabled = true;
+  let score = 0;
+  if (p.rating >= 4.3) score += 20; else if (p.rating >= 3.5) score += 10;
+  if (p.review_count >= 100) score += 15; else if (p.review_count >= 30) score += 8; else if (p.review_count >= 10) score += 4;
+  if (p.phone) score += 5;
+  if (p.website) score += 5;
+  score += 5;
+  await db.from('prospects').update({ audit_score: score, updated_at: new Date() }).eq('id', p.id);
+  await db.from('activities').insert({ prospect_id: p.id, user_id: currentUser.id, type: 'audit', content: `Audit GMB généré — Score: ${score}/100` });
+  p.audit_score = score;
+  document.getElementById('audit-btn').innerHTML = 'Générer l\'audit GMB';
+  document.getElementById('audit-btn').disabled = false;
+  notify(`Audit généré : ${score}/100`);
+  openFiche(currentProspectId);
+}
+
+async function generateOffer() {
+  const p = allProspects.find(x => x.id === currentProspectId);
+  if (!p) return;
+  document.getElementById('offer-btn').innerHTML = '<span class="loading-spinner"></span>Génération...';
+  document.getElementById('offer-btn').disabled = true;
+  try {
+    const prompt = `Tu es consultant marketing local pour l'agence AVANTI à Angers. Génère une offre commerciale (15 lignes max) pour :\nCommerce : ${p.name}\nCatégorie : ${CATS[p.category]||p.category}\nAdresse : ${p.address||'Angers'}\nNote : ${p.rating||'?'}/5 | Avis : ${p.review_count||0} | Site : ${p.website?'Oui':'Non'} | Score GMB : ${p.audit_score!=null?p.audit_score+'/100':'non calculé'}\nL'offre : accroche problème, 3 actions concrètes, tarif 150-350€/mois, appel à l'action. Ton direct.`;
+    const resp = await fetch(CLAUDE_API, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]}) });
+    const data = await resp.json();
+    const txt = data.content?.[0]?.text || 'Erreur';
+    await db.from('prospects').update({ offer_text: txt, updated_at: new Date() }).eq('id', p.id);
+    await db.from('activities').insert({ prospect_id: p.id, user_id: currentUser.id, type: 'offer', content: 'Offre générée par Claude' });
+    p.offer_text = txt;
+    notify('Offre générée !');
+  } catch(e) { notify('Erreur API', true); }
+  document.getElementById('offer-btn').innerHTML = 'Générer l\'offre';
+  document.getElementById('offer-btn').disabled = false;
+  openFiche(currentProspectId);
+}
+
+async function openProspectModal(id=null) {
+  currentProspectId = id;
+  document.getElementById('modal-prospect-title').textContent = id ? 'Modifier le prospect' : 'Nouveau prospect';
+  if (id) {
+    const p = allProspects.find(x => x.id === id);
+    if (p) {
+      document.getElementById('p-name').value = p.name||'';
+      document.getElementById('p-cat').value = p.category||'restaurant';
+      document.getElementById('p-phone').value = p.phone||'';
+      document.getElementById('p-address').value = p.address||'';
+      document.getElementById('p-website').value = p.website||'';
+      document.getElementById('p-rating').value = p.rating||0;
+      document.getElementById('p-reviews').value = p.review_count||0;
+      document.getElementById('p-stage').value = p.pipeline_stage||'to_contact';
+      document.getElementById('p-notes').value = p.notes||'';
+    }
+  } else {
+    ['p-name','p-phone','p-address','p-website','p-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('p-rating').value = 0;
+    document.getElementById('p-reviews').value = 0;
+    document.getElementById('p-stage').value = 'to_contact';
+    document.getElementById('p-cat').value = 'restaurant';
+  }
+  openModal('modal-prospect');
+}
+
+async function saveProspect() {
+  const name = document.getElementById('p-name').value.trim();
+  if (!name) { notify('Nom requis', true); return; }
+  const rating = parseFloat(document.getElementById('p-rating').value)||0;
+  const reviews = parseInt(document.getElementById('p-reviews').value)||0;
+  let score = 0;
+  if (rating == 0) score += 7; else if (rating < 3.5) score += 6; else if (rating < 4.0) score += 4; else if (rating < 4.3) score += 2;
+  if (reviews === 0) score += 4; else if (reviews < 10) score += 3; else if (reviews < 30) score += 2; else if (reviews < 60) score += 1;
+  if (!document.getElementById('p-website').value) score += 2;
+  const label = score >= 6 ? 'URGENT' : score >= 4 ? 'CHAUD' : score >= 3 ? 'TIEDE' : 'OK';
+  const payload = { name, category: document.getElementById('p-cat').value, phone: document.getElementById('p-phone').value, address: document.getElementById('p-address').value, website: document.getElementById('p-website').value, rating, review_count: reviews, pipeline_stage: document.getElementById('p-stage').value, notes: document.getElementById('p-notes').value, priority_score: score, priority_label: label, updated_at: new Date() };
+  if (currentProspectId) { await db.from('prospects').update(payload).eq('id', currentProspectId); notify('Prospect mis à jour'); }
+  else { await db.from('prospects').insert(payload); notify('Prospect ajouté'); }
+  closeModal('modal-prospect');
+  await loadProspects();
+  loadDashboard();
+}
+
+async function loadClients() {
+  const { data } = await db.from('clients').select('*').eq('status', 'active');
+  document.getElementById('clients-grid').innerHTML = (data||[]).length ? (data||[]).map(c => `
+    <div class="client-card">
+      <div class="client-name">${c.name}</div>
+      <div class="client-cat">${CATS[c.category]||c.category||'—'} · ${c.address||'Angers'}</div>
+      <div class="client-score">—</div>
+      <div style="font-size:12px;color:var(--muted)">Score GMB actuel</div>
+      <div class="client-actions">
+        <button class="btn btn-sm" onclick="notify('Rapport mensuel en cours...')">Rapport mensuel</button>
+        ${!c.google_access_token?`<button class="btn btn-sm btn-accent" onclick="notify('Lien OAuth envoyé !')">Connecter GMB</button>`:'<span style="font-size:11px;color:var(--accent)">✓ GMB connecté</span>'}
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px">Client depuis ${new Date(c.created_at).toLocaleDateString('fr-FR')}</div>
+    </div>
+  `).join('') : `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:3rem;font-size:14px">Aucun client actif.<br>Marquez un prospect comme "Signé" pour créer un client.</div>`;
+}
+
+async function loadCampaigns() {
+  const { data } = await db.from('campaigns').select('*').order('created_at', {ascending:false}).limit(20);
+  document.getElementById('campaigns-tbody').innerHTML = (data||[]).map(c => `
+    <tr>
+      <td><strong>${c.name}</strong></td><td>${c.city}</td><td>${c.radius_km} km</td>
+      <td><span class="badge ${c.status==='done'?'badge-green':c.status==='running'?'badge-blue':'badge-gray'}">${c.status}</span></td>
+      <td>${c.total_scraped}</td>
+      <td style="color:var(--muted)">${new Date(c.created_at).toLocaleDateString('fr-FR')}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Aucune campagne</td></tr>';
+}
+
+async function launchScraping() {
+  const city = document.getElementById('scrape-city').value.trim();
+  const radius = parseInt(document.getElementById('scrape-radius').value);
+  const apiKey = document.getElementById('scrape-apikey').value.trim();
+  if (!city) { notify('Entrez une ville', true); return; }
+  if (!apiKey) { notify('Clé API Google requise', true); return; }
+  document.getElementById('scrape-btn').disabled = true;
+  document.getElementById('scrape-progress').style.display = 'block';
+  const log = document.getElementById('progress-log'), bar = document.getElementById('progress-bar'), status = document.getElementById('scrape-status');
+  log.innerHTML = '';
+  const { data: camp } = await db.from('campaigns').insert({ name: `${city} — ${new Date().toLocaleDateString('fr-FR')}`, city, radius_km: radius, status: 'running', created_by: currentUser.id }).select().single();
+  const CATEGORIES = ['restaurant','hair_care','bakery','plumber','electrician','car_repair','florist','bar','beauty_salon','laundry'];
+  const seen = new Set(); let totalInserted = 0;
+  function addLog(msg) { log.innerHTML += msg + '\n'; log.scrollTop = log.scrollHeight; }
+  addLog(`Géocodage de "${city}"...`);
+  let lat = 47.4784, lng = -0.5632;
+  try { const geoResp = await fetch(PROXY + encodeURIComponent(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(city+',France')}&key=${apiKey}`)); const geoData = await geoResp.json(); if (geoData.results?.[0]?.geometry) { lat = geoData.results[0].geometry.location.lat; lng = geoData.results[0].geometry.location.lng; addLog(`Coords: ${lat.toFixed(4)}, ${lng.toFixed(4)}`); } } catch(e) { addLog('Géocodage échoué'); }
+  for (let i = 0; i < CATEGORIES.length; i++) {
+    const cat = CATEGORIES[i];
+    status.textContent = `Scraping ${i+1}/${CATEGORIES.length} — ${CATS[cat]||cat}...`;
+    bar.style.width = ((i / CATEGORIES.length) * 80) + '%';
+    addLog(`→ ${CATS[cat]||cat}...`);
+    try {
+      const resp = await fetch(PROXY + encodeURIComponent(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius*1000}&type=${cat}&language=fr&key=${apiKey}`));
+      const data = await resp.json(); const results = data.results || [];
+      addLog(`  ${results.length} résultats`);
+      for (const p of results) {
+        if (seen.has(p.place_id)) continue;
+        seen.add(p.place_id);
+        const rt=p.rating||0, rv=p.user_ratings_total||0;
+        let sc=0; if(rt===0)sc+=7;else if(rt<3.5)sc+=6;else if(rt<4.0)sc+=4;else if(rt<4.3)sc+=2; if(rv===0)sc+=4;else if(rv<10)sc+=3;else if(rv<30)sc+=2;else if(rv<60)sc+=1;
+        const{error}=await db.from('prospects').upsert({campaign_id:camp.id,place_id:p.place_id,name:p.name,address:p.vicinity||'',category:cat,rating:rt,review_count:rv,priority_score:sc,priority_label:sc>=6?'URGENT':sc>=4?'CHAUD':sc>=3?'TIEDE':'OK',pipeline_stage:'to_contact'},{onConflict:'place_id',ignoreDuplicates:true});
+        if(!error)totalInserted++;
+      }
+    } catch(e) { addLog(`  Erreur: ${e.message}`); }
+    await new Promise(r => setTimeout(r, 250));
+  }
+  await db.from('campaigns').update({ status: 'done', total_scraped: totalInserted, completed_at: new Date() }).eq('id', camp.id);
+  bar.style.width = '100%';
+  status.textContent = `✓ Terminé — ${totalInserted} prospects importés`;
+  addLog(`\nTotal: ${totalInserted} prospects`);
+  document.getElementById('scrape-btn').disabled = false;
+  notify(`Scraping terminé : ${totalInserted} prospects`);
+  await loadProspects(); await loadCampaigns(); loadDashboard();
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function notify(msg,err=false){const n=document.getElementById('notif');n.textContent=msg;n.style.background=err?'var(--warn)':'#1C1C1A';n.classList.add('show');setTimeout(()=>n.classList.remove('show'),3000);}
+function copyToClipboard(text){navigator.clipboard.writeText(text).then(()=>notify('Copié !'));}
+document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});});
+document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
+checkSession();
+</script>
+</body>
+</html>
