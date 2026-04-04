@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Connexion GMB — Local Scan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:system-ui,sans-serif;background:#F8F6F1;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+.card{background:#fff;border-radius:12px;padding:2.5rem;width:380px;text-align:center;box-shadow:0 2px 20px rgba(0,0,0,.1)}
+.logo{font-family:monospace;font-size:12px;letter-spacing:.14em;color:#7A7870;margin-bottom:1.5rem}
+.spinner{width:36px;height:36px;border:3px solid rgba(29,158,117,.2);border-top-color:#1D9E75;border-radius:50%;animation:spin .7s linear infinite;margin:1rem auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ok{color:#1D9E75;font-size:2rem}
+.err{color:#E24B4A;font-size:13px;background:#FCEBEB;padding:10px;border-radius:8px;margin-top:1rem}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">LOCAL SCAN · CRM</div>
+  <div id="content">
+    <div class="spinner"></div>
+    <h1 style="font-size:1.1rem;font-weight:500">Connexion GMB en cours...</h1>
+  </div>
+</div>
+<script>
+const SB_URL='https://cnmupogtzorsqkwjmocx.supabase.co';
+const SB_KEY='sb_publishable_MOaPEokptKk3jo7FiY5G7w_wNx507ON';
+const CLIENT_ID='31324011594-6bue2vl5c80ihrfchn25has3sv53j4fs.apps.googleusercontent.com';
+const CLIENT_SECRET='G0CSPX-Vpi9FN-2MLdV1HbvVEc2aY4YRyug';
+const REDIRECT_URI='https://adrien49royer.github.io/local-scan-crm/oauth.html';
+const {createClient}=supabase;
+const db=createClient(SB_URL,SB_KEY);
+async function run(){
+  const p=new URLSearchParams(location.search);
+  const code=p.get('code'),state=p.get('state'),err=p.get('error');
+  if(err){show('<div class="err">Accès refusé: '+err+'</div>');return;}
+  if(!code){show('<div class="err">Pas de code reçu.</div>');return;}
+  try{
+    const fd=new URLSearchParams({code,client_id:CLIENT_ID,client_secret:CLIENT_SECRET,redirect_uri:REDIRECT_URI,grant_type:'authorization_code'});
+    const r=await fetch('https://oauth2.googleapis.com/token',{method:'POST',body:fd});
+    const t=await r.json();
+    if(t.error){show('<div class="err">'+t.error_description+'</div>');return;}
+    const expires_at=new Date(Date.now()+t.expires_in*1000).toISOString();
+    let gmb_account_id=null;
+    try{
+      const ar=await fetch('https://mybusinessaccountmanagement.googleapis.com/v1/accounts',{headers:{'Authorization':'Bearer '+t.access_token}});
+      const ad=await ar.json();
+      gmb_account_id=ad.accounts?.[0]?.name||null;
+    }catch(e){}
+    if(state){
+      await db.from('clients').update({google_access_token:t.access_token,google_refresh_token:t.refresh_token,google_token_expires_at:expires_at,gmb_account_id}).eq('id',state);
+    }
+    show('<div class="ok">✓</div><h1 style="font-size:1.1rem;font-weight:500;margin:.5rem 0">GMB connecté !</h1><p style="font-size:13px;color:#7A7870">Fermeture dans 3s...</p>');
+    setTimeout(()=>window.close(),3000);
+  }catch(e){show('<div class="err">'+e.message+'</div>');}
+}
+function show(h){document.getElementById('content').innerHTML=h;}
+run();
+</script>
+</body>
+</html>
