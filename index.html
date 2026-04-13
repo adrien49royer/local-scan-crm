@@ -901,7 +901,8 @@ async function genAuditReport(prospectId){
   const details=p.audit_details?JSON.parse(p.audit_details):{};
   const ko=(details.criteria||[]).filter(c=>!c.ok);
   const btn=event?.currentTarget;if(btn){btn.textContent="...";btn.disabled=true;}
-  const prompt="Tu es consultant marketing local pour AVANTI a Angers.\nRapport audit GMB pour: "+p.name+"\nNote: "+(p.rating||"N/A")+"/5 ("+(p.review_count||0)+" avis) | Score: "+p.audit_score+"/100\nPoints a ameliorer:\n"+ko.map(c=>"- "+c.label+": "+c.tip).join("\n")+"\n\nStructure: 1) Synthese, 2) Points forts, 3) Points critiques avec impact, 4) Plan action 30j, 5) Gains estimes. 400 mots max.";
+  const lines=["Tu es consultant marketing local pour AVANTI a Angers.","Rapport audit GMB pour: "+p.name,"Note: "+(p.rating||"N/A")+"/5 ("+(p.review_count||0)+" avis) | Score: "+p.audit_score+"/100","Points a ameliorer:"].concat(ko.map(c=>"- "+c.label+": "+c.tip)).concat(["","Structure: 1) Synthese, 2) Points forts, 3) Points critiques avec impact, 4) Plan action 30j, 5) Gains estimes. 400 mots max."]);
+  const prompt=lines.join("\n");
   const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:prompt}]})});
   const data=await resp.json();const rapport=data.content?.[0]?.text||"Erreur";
   if(btn){btn.textContent="Generer rapport";btn.disabled=false;}
