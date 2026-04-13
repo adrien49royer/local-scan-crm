@@ -255,6 +255,7 @@ tr:hover td{background:var(--bg)}
           <option value="email">Avec email</option>
           <option value="phone">Avec tél</option>
         </select>
+        <input id="filter-city" oninput="filterProspects()" placeholder="Filtrer par ville..." style="font-size:12px;padding:6px 10px;border:1px solid var(--bs);border-radius:7px;background:var(--bg);color:var(--text);font-family:var(--sans);width:140px">
         <select id="filter-priority" onchange="filterProspects()">
           <option value="">Toutes priorités</option>
           <option value="URGENT">Urgent</option>
@@ -544,7 +545,7 @@ function filterProspects() {
   const q = document.getElementById('search-prospects').value.toLowerCase();
   const stage = document.getElementById('filter-stage').value;
   const prio = document.getElementById('filter-priority').value;
-  renderProspects(allProspects.filter(p => (!q||p.name.toLowerCase().includes(q)||(p.address||'').toLowerCase().includes(q))&&(!stage||p.pipeline_stage===stage)&&(!prio||p.priority_label===prio)));
+  renderProspects(allProspects.filter(p => (!q||p.name.toLowerCase().includes(q)||(p.address||'').toLowerCase().includes(q))&&(!stage||p.pipeline_stage===stage)&&(!prio||p.priority_label===prio)&&(()=>{const cf=(document.getElementById('filter-contact')?.value||'');const mC=!cf||(cf==='email'?!!p.email:!!p.phone);const cv=(document.getElementById('filter-city')?.value||'').toLowerCase().trim();const mV=!cv||((p.address||'').toLowerCase().includes(cv));return mC&&mV;})()));
 }
 
 function renderKanban() {
@@ -828,6 +829,19 @@ document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key===
 checkSession();
 
 
+function downloadAuditPDF(){
+  const modal=document.getElementById('modal-audit');
+  const title=document.getElementById('audit-title')?.textContent||'Audit GMB';
+  const content=document.getElementById('audit-content');
+  if(!content){alert('Lancez d\'abord un audit');return;}
+  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+title+'</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#222}h1{color:#2c3e50}h2{color:#34495e;border-bottom:2px solid #eee;padding-bottom:8px}.ok{color:#27ae60}.ko{color:#e74c3c}.score{font-size:48px;font-weight:bold;color:#2c3e50;text-align:center;padding:20px}.criteria{margin:8px 0;padding:8px 12px;background:#f8f9fa;border-radius:4px}@media print{button{display:none}}</style></head><body>'+content.innerHTML+'<br><p style="color:#999;font-size:11px;text-align:center">Rapport généré par Local Scan &mdash; '+new Date().toLocaleDateString('fr-FR')+'</p></body></html>';
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='audit-gmb-'+Date.now()+'.html';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 async function runPublicAudit(prospectId){
   const p=allProspects.find(x=>x.id===prospectId);
   if(!p){notify("Prospect introuvable",true);return null;}
@@ -933,7 +947,7 @@ async function genDescImprovement(prospectId){
   <div class="modal" style="max-width:700px">
     <div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div>
     <div class="modal-body" id="audit-modal-body" style="max-height:70vh;overflow-y:auto"></div>
-    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button></div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button> <button onclick="downloadAuditPDF()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-size:13px">&#128196; Télécharger PDF</button></div>
   </div>
 </div>
 
@@ -941,10 +955,10 @@ async function genDescImprovement(prospectId){
   <div class="modal" style="max-width:700px">
     <div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div>
     <div class="modal-body" id="audit-modal-body" style="max-height:65vh;overflow-y:auto"></div>
-    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button></div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button> <button onclick="downloadAuditPDF()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-size:13px">&#128196; Télécharger PDF</button></div>
   </div>
 </div>
 
-<div class="modal-bg" id="modal-audit"><div class="modal" style="max-width:700px"><div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div><div class="modal-body" id="audit-modal-body" style="max-height:65vh;overflow-y:auto"></div><div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button></div></div></div>
+<div class="modal-bg" id="modal-audit"><div class="modal" style="max-width:700px"><div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div><div class="modal-body" id="audit-modal-body" style="max-height:65vh;overflow-y:auto"></div><div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button> <button onclick="downloadAuditPDF()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-size:13px">&#128196; Télécharger PDF</button></div></div></div>
 </body>
 </html>
