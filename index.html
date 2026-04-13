@@ -261,12 +261,12 @@ tr:hover td{background:var(--bg)}
           <option value="CHAUD">Chaud</option>
           <option value="TIEDE">Tiède</option>
           <option value="OK">OK</option>
-        </select>
+        </select> <select id="filter-contact" onchange="filterProspects()" style="font-size:12px;padding:6px 10px;border:1px solid var(--bs);border-radius:7px;background:var(--bg);color:var(--text);font-family:var(--sans)"><option value="">Tous contacts</option><option value="email">Avec email</option><option value="phone">Avec tél</option></select>
         <button class="btn btn-accent" onclick="openProspectModal()">+ Ajouter</button>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>#</th><th>Commerce</th><th>Catégorie</th><th>Note</th><th>Avis</th><th>Priorité</th><th>Stade</th><th>Assigné</th><th>Score</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Commerce</th><th>Catégorie</th><th>Note</th><th>Avis</th><th>Tél</th><th>Email</th><th>Priorité</th><th>Stade</th><th>Assigné</th><th>Score</th><th></th></tr></thead>
           <tbody id="prospects-tbody"></tbody>
         </table>
       </div>
@@ -479,7 +479,7 @@ function showPage(name) {
 }
 
 async function loadDashboard() {
-  const { data: prospects } = await db.from('prospects').select('*');
+  const { data: prospects } = await db.from('prospects').select('*,phone,website,email');
   const { data: clients } = await db.from('clients').select('*').eq('status', 'active');
   allProspects = prospects || [];
   const urgent = allProspects.filter(p => p.priority_label === 'URGENT').length;
@@ -530,7 +530,7 @@ function renderProspects(list) {
       <td><strong style="cursor:pointer;color:var(--accent)" onclick="openFiche('${p.id}')">${p.name}</strong></td>
       <td>${CATS[p.category]||p.category||'—'}</td>
       <td>${p.rating>0?p.rating+'★':'—'}</td>
-      <td>${p.review_count||0}</td>
+      <td>${p.review_count||0}</td><td style="font-size:11px;color:#aaa">${p.phone||''}</td><td style="font-size:11px">${p.email?'<a href="mailto:'+p.email+'" style="color:#4ade80">✉ '+p.email.split('@')[0]+'</a>':''}</td>
       <td><span class="badge ${PRIORITY_BADGE[p.priority_label]||'badge-gray'}">${p.priority_label||'OK'}</span></td>
       <td><span class="badge ${STAGE_BADGE[p.pipeline_stage]||'badge-gray'}">${STAGES[p.pipeline_stage]||p.pipeline_stage}</span></td>
       <td style="color:var(--muted);font-size:12px">—</td>
