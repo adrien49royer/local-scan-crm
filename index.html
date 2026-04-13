@@ -802,8 +802,8 @@ async function launchScraping() {
         seen.add(p.place_id);
         const rt=p.rating||0, rv=p.user_ratings_total||0;
         let sc=0; if(rt===0)sc+=7;else if(rt<3.5)sc+=6;else if(rt<4.0)sc+=4;else if(rt<4.3)sc+=2; if(rv===0)sc+=4;else if(rv<10)sc+=3;else if(rv<30)sc+=2;else if(rv<60)sc+=1;
-        const{error}=const det=await enrichPlace(p.place_id,apiKey,PROXY);
-        await db.from('prospects').upsert({campaign_id:camp.id,place_id:p.place_id,name:p.name,address:p.vicinity||'',category:cat,rating:rt,review_count:rv,priority_score:sc,priority_label:sc>=6?'URGENT':sc>=4?'CHAUD':sc>=3?'TIEDE':'OK',pipeline_stage:'to_contact',phone:det.phone||null,website:det.website||null,email:det.email||null},{onConflict:'place_id',ignoreDuplicates:true});
+        const det=await enrichPlace(p.place_id,apiKey,PROXY);
+        const{error}=await db.from('prospects').upsert({campaign_id:camp.id,place_id:p.place_id,name:p.name,address:p.vicinity||'',category:cat,rating:rt,review_count:rv,priority_score:sc,priority_label:sc>=6?'URGENT':sc>=4?'CHAUD':sc>=3?'TIEDE':'OK',pipeline_stage:'to_contact',phone:det.phone||null,website:det.website||null,email:det.email||null},{onConflict:'place_id',ignoreDuplicates:true});
         if(!error)totalInserted++;
       }
     } catch(e) { addLog(`  Erreur: ${e.message}`); }
