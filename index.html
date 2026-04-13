@@ -820,128 +820,100 @@ checkSession();
 
 async function runPublicAudit(prospectId){
   const p=allProspects.find(x=>x.id===prospectId);
-  if(!p){notify('Prospect introuvable',true);return null;}
-  const apiKey='AIzaSyBQf9tv7HuG9cYho9ZQnVuTMXKidE0nK_M';
-  const proxy='https://gmaps-proxy.adrien49-royer.workers.dev/?url=';
+  if(!p){notify("Prospect introuvable",true);return null;}
+  const apiKey="AIzaSyBQf9tv7HuG9cYho9ZQnVuTMXKidE0nK_M";
+  const proxy="https://gmaps-proxy.adrien49-royer.workers.dev/?url=";
   let det={};
-  if(p.place_id){
-    try{
-      const fields='name,rating,user_ratings_total,formatted_phone_number,formatted_address,website,opening_hours,photos,types,editorial_summary,business_status,reviews,price_level';
-      const url='https://maps.googleapis.com/maps/api/place/details/json?place_id='+p.place_id+'&fields='+fields+'&language=fr&key='+apiKey;
-      const r=await fetch(proxy+encodeURIComponent(url));
-      const d=await r.json();
-      det=d.result||{};
-    }catch(e){}
-  }
-  const r=det.rating||p.rating||0;
-  const rv=det.user_ratings_total||p.review_count||0;
+  if(p.place_id){try{const fields="name,rating,user_ratings_total,formatted_phone_number,formatted_address,website,opening_hours,photos,types,editorial_summary,business_status,reviews";const url="https://maps.googleapis.com/maps/api/place/details/json?place_id="+p.place_id+"&fields="+fields+"&language=fr&key="+apiKey;const r=await fetch(proxy+encodeURIComponent(url));const d=await r.json();det=d.result||{};}catch(e){}}
+  const rating=det.rating||p.rating||0;
+  const reviewCount=det.user_ratings_total||p.review_count||0;
   const hrs=det.opening_hours?.periods?.length||0;
   const photos=det.photos?.length||0;
   const desc=det.editorial_summary?.overview?.length||0;
   const types=det.types||[];
   const reviews=det.reviews||[];
-  const unans=reviews.filter(r=>!r.author_url?.includes('owner')).length;
   const criteria=[
-    {label:"Nom renseigne",cat:"Infos de base",score:(det.name||p.name)?5:0,max:5,ok:!!(det.name||p.name),tip:"Le nom doit etre exact sans mots-cles artificiels"},
-    {label:"Adresse complete",cat:"Infos de base",score:(det.formatted_address||p.address)?5:0,max:5,ok:!!(det.formatted_address||p.address),tip:"Verifier et completer l'adresse dans Google Business Profile"},
-    {label:"Numero de telephone",cat:"Infos de base",score:det.formatted_phone_number||p.phone?5:0,max:5,ok:!!(det.formatted_phone_number||p.phone),tip:"Ajouter un numero de telephone local"},
-    {label:"Site web",cat:"Infos de base",score:(det.website||p.website)?5:0,max:5,ok:!!(det.website||p.website),tip:"Ajouter l'URL du site web dans la fiche"},
-    {label:"Horaires (5j+)",cat:"Completude",score:hrs>=5?5:hrs>0?3:0,max:5,ok:hrs>=5,tip:"Renseigner les horaires pour tous les jours ouverts ("+hrs+" jours actuellement)"},
-    {label:"Horaires speciaux",cat:"Completude",score:det.opening_hours?.special_hours?.length?5:0,max:5,ok:!!det.opening_hours?.special_hours?.length,tip:"Ajouter les horaires pour jours feries et periodes exceptionnelles"},
-    {label:"Categorie principale",cat:"Completude",score:types.length>0?5:0,max:5,ok:types.length>0,tip:"Verifier et optimiser la categorie principale"},
-    {label:"Categories secondaires",cat:"Completude",score:types.length>2?5:types.length>1?3:0,max:5,ok:types.length>2,tip:"Ajouter des categories secondaires pertinentes"},
-    {label:"Description (150+ car.)",cat:"Contenu",score:desc>150?10:desc>50?6:desc>0?3:0,max:10,ok:desc>150,tip:"Rediger une description complete avec mots-cles ("+desc+" car. actuellement, 150+ requis)"},
-    {label:"Photos (10+)",cat:"Contenu",score:photos>=10?10:photos>=5?6:photos>=1?3:0,max:10,ok:photos>=10,tip:"Ajouter des photos : facade, interieur, equipe, produits ("+photos+" actuellement)"},
-    {label:"Note Google (4+)",cat:"Reputation",score:r>=4.5?10:r>=4.0?7:r>=3.5?4:r>0?2:0,max:10,ok:r>=4.0,tip:"Note actuelle: "+(r||"N/A")+"/5 — Encourager les clients satisfaits a laisser un avis"},
-    {label:"Volume avis (50+)",cat:"Reputation",score:rv>=100?10:rv>=50?7:rv>=20?4:rv>=5?2:0,max:10,ok:rv>=50,tip:rv+" avis — Mettre en place une strategie de collecte d'avis"},
-    {label:"Reponses aux avis",cat:"Reputation",score:reviews.length>0&&unans<reviews.length?5:0,max:5,ok:reviews.length>0&&unans<reviews.length,tip:"Repondre a chaque avis pour montrer votre engagement"},
-    {label:"Fiche operationnelle",cat:"Technique",score:det.business_status==="OPERATIONAL"?5:0,max:5,ok:det.business_status==="OPERATIONAL",tip:"Statut: "+(det.business_status||"inconnu")+" — verifier que la fiche n'est pas fermee"}
+    {label:"Nom renseigne",cat:"Infos de base",score:(det.name||p.name)?5:0,max:5,ok:!!(det.name||p.name),tip:"Le nom doit etre exact"},
+    {label:"Adresse complete",cat:"Infos de base",score:(det.formatted_address||p.address)?5:0,max:5,ok:!!(det.formatted_address||p.address),tip:"Verifier l'adresse dans Google Business Profile"},
+    {label:"Telephone",cat:"Infos de base",score:(det.formatted_phone_number||p.phone)?5:0,max:5,ok:!!(det.formatted_phone_number||p.phone),tip:"Ajouter un numero de telephone local"},
+    {label:"Site web",cat:"Infos de base",score:(det.website||p.website)?5:0,max:5,ok:!!(det.website||p.website),tip:"Ajouter l'URL du site dans la fiche"},
+    {label:"Horaires (5j+)",cat:"Completude",score:hrs>=5?5:hrs>0?3:0,max:5,ok:hrs>=5,tip:"Horaires complets pour tous les jours ouverts ("+hrs+" jours)"},
+    {label:"Horaires speciaux",cat:"Completude",score:det.opening_hours?.special_hours?.length?5:0,max:5,ok:!!det.opening_hours?.special_hours?.length,tip:"Ajouter les horaires jours feries"},
+    {label:"Categorie principale",cat:"Completude",score:types.length>0?5:0,max:5,ok:types.length>0,tip:"Verifier la categorie principale"},
+    {label:"Categories secondaires",cat:"Completude",score:types.length>2?5:types.length>1?3:0,max:5,ok:types.length>2,tip:"Ajouter des categories secondaires"},
+    {label:"Description (150+)",cat:"Contenu",score:desc>150?10:desc>50?6:desc>0?3:0,max:10,ok:desc>150,tip:"Description avec mots-cles ("+desc+" car. — 150+ requis)"},
+    {label:"Photos (10+)",cat:"Contenu",score:photos>=10?10:photos>=5?6:photos>=1?3:0,max:10,ok:photos>=10,tip:"Ajouter photos facade/interieur/equipe ("+photos+" actuellement)"},
+    {label:"Note Google (4+)",cat:"Reputation",score:rating>=4.5?10:rating>=4.0?7:rating>=3.5?4:rating>0?2:0,max:10,ok:rating>=4.0,tip:"Note: "+(rating||"N/A")+"/5 — Encourager les clients satisfaits"},
+    {label:"Volume avis (50+)",cat:"Reputation",score:reviewCount>=100?10:reviewCount>=50?7:reviewCount>=20?4:reviewCount>=5?2:0,max:10,ok:reviewCount>=50,tip:reviewCount+" avis — Mettre en place une strategie de collecte"},
+    {label:"Reponses aux avis",cat:"Reputation",score:reviews.length>0?5:0,max:5,ok:reviews.length>0,tip:"Repondre a chaque avis"},
+    {label:"Fiche operationnelle",cat:"Technique",score:det.business_status==="OPERATIONAL"?5:0,max:5,ok:det.business_status==="OPERATIONAL",tip:"Statut: "+(det.business_status||"inconnu")}
   ];
   const score=Math.round(criteria.reduce((s,c)=>s+c.score,0)/criteria.reduce((s,c)=>s+c.max,0)*100);
-  await db.from('prospects').update({audit_score:score,audit_details:JSON.stringify({criteria,details:{name:det.name||p.name,rating:r,reviewCount:rv,hasPhone:!!(det.formatted_phone_number||p.phone),hasWebsite:!!(det.website||p.website),hoursCount:hrs,photoCount:photos,descLen:desc,types},audited_at:new Date().toISOString()}),updated_at:new Date()}).eq('id',prospectId);
-  await db.from('activities').insert({prospect_id:prospectId,user_id:currentUser.id,type:'audit',content:'Audit GMB '+score+'/100 — '+criteria.filter(c=>!c.ok).length+' points a corriger'});
+  await db.from("prospects").update({audit_score:score,audit_details:JSON.stringify({criteria,audited_at:new Date().toISOString()}),updated_at:new Date()}).eq("id",prospectId);
+  await db.from("activities").insert({prospect_id:prospectId,user_id:currentUser.id,type:"audit",content:"Audit GMB "+score+"/100 — "+criteria.filter(c=>!c.ok).length+" points a corriger"});
   const idx=allProspects.findIndex(x=>x.id===prospectId);
   if(idx>=0)allProspects[idx].audit_score=score;
   return{score,criteria,det,p};
 }
-
 async function openProspectAudit(prospectId){
-  const btn=event?.currentTarget;
-  if(btn){btn.textContent='Audit...';btn.disabled=true;}
+  const btn=document.getElementById("audit-btn");
+  if(btn){btn.textContent="Analyse...";btn.disabled=true;}
   const res=await runPublicAudit(prospectId);
-  if(btn){btn.textContent='Audit GMB';btn.disabled=false;}
+  if(btn){btn.textContent="Audit GMB complet";btn.disabled=false;}
   if(!res)return;
   showAuditModal(res);
 }
-
 function showAuditModal(res){
   const{score,criteria,det,p}=res;
-  const col=score>=70?'var(--accent)':score>=45?'#EF9F27':'var(--warn)';
-  const lbl=score>=70?'Bien optimisee':score>=45?'A ameliorer':'Critique — action urgente';
-  const ko=criteria.filter(c=>!c.ok);
-  const ok=criteria.filter(c=>c.ok);
+  const col=score>=70?"var(--accent)":score>=45?"#EF9F27":"var(--warn)";
+  const lbl=score>=70?"Bien optimisee":score>=45?"A ameliorer":"Critique";
+  const ko=criteria.filter(c=>!c.ok);const ok=criteria.filter(c=>c.ok);
   const cats=[...new Set(criteria.map(c=>c.cat))];
-  let html='<div style="display:flex;align-items:center;gap:16px;padding:1rem;background:var(--bg);border-radius:10px;margin-bottom:1.25rem">';
-  html+='<div style="text-align:center"><div style="font-size:52px;font-weight:500;color:'+col+';line-height:1">'+score+'</div><div style="font-size:12px;color:var(--muted)">/100</div></div>';
-  html+='<div style="flex:1"><div style="font-size:15px;font-weight:500;margin-bottom:4px">'+lbl+'</div>';
-  html+='<div style="font-size:12px;color:var(--muted);margin-bottom:8px">'+p.name+' — '+(p.address||'Angers')+'</div>';
-  html+='<div style="display:flex;gap:8px"><span style="font-size:11px;background:#EAF3DE;color:#3B6D11;padding:2px 8px;border-radius:4px">'+ok.length+' criteres OK</span>';
-  html+='<span style="font-size:11px;background:#FCEBEB;color:#A32D2D;padding:2px 8px;border-radius:4px">'+ko.length+' a corriger</span></div></div>';
-  html+='<div style="text-align:center"><div style="font-size:22px;font-weight:500">'+(det.rating||p.rating||'—')+'&#9733;</div>';
-  html+='<div style="font-size:11px;color:var(--muted)">'+(det.user_ratings_total||p.review_count||0)+' avis</div>';
-  html+='<div style="font-size:11px;color:var(--muted);margin-top:4px">'+(det.photos?.length||0)+' photos</div></div></div>';
+  let html="<div style=\"display:flex;align-items:center;gap:16px;padding:1rem;background:var(--bg);border-radius:10px;margin-bottom:1rem\">";
+  html+="<div style=\"text-align:center\"><div style=\"font-size:52px;font-weight:500;color:"+col+";line-height:1\">"+score+"</div><div style=\"font-size:12px;color:var(--muted)\">/100</div></div>";
+  html+="<div style=\"flex:1\"><div style=\"font-size:15px;font-weight:500;margin-bottom:4px\">"+lbl+"</div>";
+  html+="<div style=\"font-size:12px;color:var(--muted);margin-bottom:8px\">"+p.name+"</div>";
+  html+="<div style=\"display:flex;gap:8px\"><span style=\"font-size:11px;background:#EAF3DE;color:#3B6D11;padding:2px 8px;border-radius:4px\">"+ok.length+" OK</span>";
+  html+="<span style=\"font-size:11px;background:#FCEBEB;color:#A32D2D;padding:2px 8px;border-radius:4px\">"+ko.length+" a corriger</span></div></div>";
+  html+="<div style=\"text-align:center\"><div style=\"font-size:22px;font-weight:500\">"+(det.rating||p.rating||"-")+"&#9733;</div>";
+  html+="<div style=\"font-size:11px;color:var(--muted)\">"+(det.user_ratings_total||p.review_count||0)+" avis</div>";
+  html+="<div style=\"font-size:11px;color:var(--muted);margin-top:2px\">"+(det.photos?.length||0)+" photos</div></div></div>";
   cats.forEach(cat=>{
     const items=criteria.filter(c=>c.cat===cat);
-    html+='<div style="margin-bottom:1rem"><div style="font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--bd)">'+cat.toUpperCase()+' — '+items.filter(c=>c.ok).length+'/'+items.length+' OK</div>';
+    html+="<div style=\"margin-bottom:.75rem\"><div style=\"font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid var(--bd)\">"+cat.toUpperCase()+" — "+items.filter(c=>c.ok).length+"/"+items.length+" OK</div>";
     items.forEach(c=>{
-      html+='<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:'+(c.ok?'#EAF3DE':'#FCEBEB')+';border-radius:7px;margin-bottom:4px">';
-      html+='<span style="font-size:14px;margin-top:1px">'+(c.ok?'&#10003;':'&#10007;')+'</span>';
-      html+='<div style="flex:1"><div style="font-size:12px;font-weight:500;color:#1C1C1A">'+c.label+'</div>';
-      if(!c.ok)html+='<div style="font-size:11px;color:#666;margin-top:2px">&#8594; '+c.tip+'</div>';
-      html+='</div><span style="font-family:monospace;font-size:11px;color:#666;white-space:nowrap">'+c.score+'/'+c.max+'</span></div>';
+      html+="<div style=\"display:flex;align-items:flex-start;gap:10px;padding:7px 10px;background:"+(c.ok?"#EAF3DE":"#FCEBEB")+";border-radius:7px;margin-bottom:3px\">";
+      html+="<span style=\"font-size:13px;margin-top:1px\">"+(c.ok?"&#10003;":"&#10007;")+"</span>";
+      html+="<div style=\"flex:1\"><div style=\"font-size:12px;font-weight:500;color:#1C1C1A\">"+c.label+"</div>";
+      if(!c.ok)html+="<div style=\"font-size:11px;color:#666;margin-top:2px\">&#8594; "+c.tip+"</div>";
+      html+="</div><span style=\"font-family:monospace;font-size:11px;color:#666\">"+c.score+"/"+c.max+"</span></div>";
     });
-    html+='</div>';
+    html+="</div>";
   });
-  html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:.5rem">';
-  html+='<button class="btn btn-sm btn-accent" onclick="genAuditReport(''+p.id+'')">Generer rapport complet</button>';
-  html+='<button class="btn btn-sm" onclick="genDescImprovement(''+p.id+'')">Ameliorer description</button></div>';
-  document.getElementById('audit-modal-body').innerHTML=html;
-  document.getElementById('modal-audit').classList.add('open');
+  html+="<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:.5rem\">";
+  html+="<button class=\"btn btn-sm btn-accent\" onclick=\"genAuditReport('"+p.id+"')\" >Generer rapport</button>";
+  html+="<button class=\"btn btn-sm\" onclick=\"genDescImprovement('"+p.id+"')\">Ameliorer description</button></div>";
+  document.getElementById("audit-modal-body").innerHTML=html;
+  document.getElementById("modal-audit").classList.add("open");
 }
-
 async function genAuditReport(prospectId){
-  const p=allProspects.find(x=>x.id===prospectId);
-  if(!p||p.audit_score==null){notify('Lance d abord l audit',true);return;}
+  const p=allProspects.find(x=>x.id===prospectId);if(!p)return;
   const details=p.audit_details?JSON.parse(p.audit_details):{};
-  const criteria=details.criteria||[];
-  const ko=criteria.filter(c=>!c.ok);
-  const btn=event?.currentTarget;
-  if(btn){btn.textContent='Generation...';btn.disabled=true;}
-  const prompt='Tu es consultant marketing local pour l agence AVANTI a Angers. Rapport audit GMB professionnel pour :\nCommerce: '+p.name+'\nNote: '+(p.rating||'N/A')+'/5 ('+( p.review_count||0)+' avis)\nScore GMB: '+p.audit_score+'/100\nPoints a ameliorer:\n'+ko.map(c=>'- '+c.label+': '+c.tip).join('\n')+'\n\nStructure: 1) Synthese executive, 2) Points forts, 3) Points critiques avec impact business, 4) Plan action 30j, 5) Gains estimes. Ton professionnel, 400 mots max.';
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})});
-  const data=await resp.json();
-  const rapport=data.content?.[0]?.text||'Erreur';
-  if(btn){btn.textContent='Generer rapport complet';btn.disabled=false;}
-  document.getElementById('audit-modal-body').insertAdjacentHTML('beforeend',
-    '<div style="margin-top:1rem;border:1px solid var(--bs);border-radius:8px;overflow:hidden">'+
-    '<div style="padding:10px 14px;background:var(--bg);font-family:var(--mono);font-size:10px;color:var(--muted);border-bottom:1px solid var(--bs)">RAPPORT AUDIT — '+p.name.toUpperCase()+'</div>'+
-    '<div id="rapport-txt" style="padding:14px;font-size:13px;line-height:1.6;white-space:pre-wrap">'+rapport+'</div>'+
-    '<div style="padding:10px 14px;border-top:1px solid var(--bs)"><button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('rapport-txt').textContent).then(()=>notify('Copie!'))">Copier le rapport</button></div></div>'
-  );
-  notify('Rapport genere!');
+  const ko=(details.criteria||[]).filter(c=>!c.ok);
+  const btn=event?.currentTarget;if(btn){btn.textContent="...";btn.disabled=true;}
+  const prompt="Tu es consultant marketing local pour AVANTI a Angers.\nRapport audit GMB pour: "+p.name+"\nNote: "+(p.rating||"N/A")+"/5 ("+(p.review_count||0)+" avis) | Score: "+p.audit_score+"/100\nPoints a ameliorer:\n"+ko.map(c=>"- "+c.label+": "+c.tip).join("\n")+"\n\nStructure: 1) Synthese, 2) Points forts, 3) Points critiques avec impact, 4) Plan action 30j, 5) Gains estimes. 400 mots max.";
+  const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:prompt}]})});
+  const data=await resp.json();const rapport=data.content?.[0]?.text||"Erreur";
+  if(btn){btn.textContent="Generer rapport";btn.disabled=false;}
+  document.getElementById("audit-modal-body").insertAdjacentHTML("beforeend","<div style=\"margin-top:1rem;border:1px solid var(--bs);border-radius:8px;overflow:hidden\"><div style=\"padding:10px 14px;background:var(--bg);font-family:var(--mono);font-size:10px;color:var(--muted);border-bottom:1px solid var(--bs)\">RAPPORT — "+p.name.toUpperCase()+"</div><div id=\"rapport-txt\" style=\"padding:14px;font-size:13px;line-height:1.6;white-space:pre-wrap\">"+rapport+"</div><div style=\"padding:10px 14px;border-top:1px solid var(--bs)\"><button class=\"btn btn-sm btn-primary\" onclick=\"navigator.clipboard.writeText(document.getElementById('rapport-txt').textContent).then(()=>notify('Copie!'))\">Copier</button></div></div>");
+  notify("Rapport genere!");
 }
-
 async function genDescImprovement(prospectId){
   const p=allProspects.find(x=>x.id===prospectId);
-  const prompt='Description Google My Business pour "'+p.name+'" a Angers. 250 chars max, mots-cles locaux, accrocheur. Donne 2 versions courtes.';
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:prompt}]})});
-  const data=await resp.json();
-  const txt=data.content?.[0]?.text||'';
-  document.getElementById('audit-modal-body').insertAdjacentHTML('beforeend',
-    '<div style="margin-top:1rem;background:var(--bg);border-radius:8px;padding:12px">'+
-    '<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">DESCRIPTIONS SUGGEREES</div>'+
-    '<div style="font-size:13px;line-height:1.7;white-space:pre-wrap">'+txt+'</div></div>'
-  );
+  const prompt="Description Google My Business pour \""+p.name+"\" a Angers. 250 chars max, mots-cles locaux. 2 versions.";
+  const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:300,messages:[{role:"user",content:prompt}]})});
+  const data=await resp.json();const txt=data.content?.[0]?.text||"";
+  document.getElementById("audit-modal-body").insertAdjacentHTML("beforeend","<div style=\"margin-top:1rem;background:var(--bg);border-radius:8px;padding:12px\"><div style=\"font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px\">DESCRIPTIONS SUGGEREES</div><div style=\"font-size:13px;line-height:1.7;white-space:pre-wrap\">"+txt+"</div></div>");
 }
 
 </script>
