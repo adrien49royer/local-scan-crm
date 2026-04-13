@@ -250,6 +250,11 @@ tr:hover td{background:var(--bg)}
           <option value="signed">Signé</option>
           <option value="lost">Perdu</option>
         </select>
+        <select id="filter-email" onchange="filterProspects()" style="font-size:12px;padding:6px 10px;border:1px solid var(--bs);border-radius:7px;background:var(--bg);font-family:var(--sans)">
+          <option value="">Tous contacts</option>
+          <option value="email">Avec email</option>
+          <option value="phone">Avec tél</option>
+        </select>
         <select id="filter-priority" onchange="filterProspects()">
           <option value="">Toutes priorités</option>
           <option value="URGENT">Urgent</option>
@@ -513,7 +518,7 @@ async function loadDashboard() {
 }
 
 async function loadProspects() {
-  const { data } = await db.from('prospects').select('*').order('priority_score', {ascending:false});
+  const { data } = await db.from('prospects').select('*,phone,website,email').order('priority_score', {ascending:false});
   allProspects = data || [];
   renderProspects(allProspects);
 }
@@ -571,6 +576,9 @@ async function openFiche(id) {
   const p = allProspects.find(x => x.id === id);
   if (!p) return;
   document.getElementById('fiche-title').textContent = p.name;
+  // Ajouter les coordonnées dans l'en-tête de la fiche si dispo
+  const coordHtml = [p.phone?'<a href="tel:'+p.phone+'" style="color:var(--accent);font-size:13px;text-decoration:none">&#128222; '+p.phone+'</a>':'',p.email?'<a href="mailto:'+p.email+'" style="color:var(--accent);font-size:13px;text-decoration:none">&#9993; '+p.email+'</a>':'',p.website?'<a href="'+p.website+'" target="_blank" style="color:var(--muted);font-size:12px;text-decoration:none">&#127760; Site web</a>':''].filter(Boolean).join(' &nbsp; ');
+  if(coordHtml) document.getElementById('fiche-coords')?.remove(), document.querySelector('#modal-fiche .modal-body')?.insertAdjacentHTML('afterbegin','<div id="fiche-coords" style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--bd);margin-bottom:4px">'+coordHtml+'</div>');
   const { data: acts } = await db.from('activities').select('*').eq('prospect_id', id).order('created_at', {ascending:false}).limit(10);
   const dotColor = {note:'amber',call:'blue',email:'blue',meeting:'green',stage_change:'green',audit:'amber',offer:'blue',report:'green'};
   document.getElementById('fiche-body').innerHTML = `
