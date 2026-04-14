@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"><!-- build:1776171810805 -->
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Local Scan CRM</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -255,7 +255,6 @@ tr:hover td{background:var(--bg)}
           <option value="email">Avec email</option>
           <option value="phone">Avec tél</option>
         </select>
-        <input id="filter-city" oninput="filterProspects()" placeholder="Filtrer par ville..." style="font-size:12px;padding:6px 10px;border:1px solid var(--bs);border-radius:7px;background:var(--bg);color:var(--text);font-family:var(--sans);width:140px">
         <select id="filter-priority" onchange="filterProspects()">
           <option value="">Toutes priorités</option>
           <option value="URGENT">Urgent</option>
@@ -545,7 +544,7 @@ function filterProspects() {
   const q = document.getElementById('search-prospects').value.toLowerCase();
   const stage = document.getElementById('filter-stage').value;
   const prio = document.getElementById('filter-priority').value;
-  renderProspects(allProspects.filter(p => (!q||p.name.toLowerCase().includes(q)||(p.address||'').toLowerCase().includes(q))&&(!stage||p.pipeline_stage===stage)&&(!prio||p.priority_label===prio)&&(()=>{const cf=(document.getElementById('filter-contact')?.value||'');const mC=!cf||(cf==='email'?!!p.email:!!p.phone);const cv=(document.getElementById('filter-city')?.value||'').toLowerCase().trim();const mV=!cv||((p.address||'').toLowerCase().includes(cv));return mC&&mV;})()));
+  renderProspects(allProspects.filter(p => (!q||p.name.toLowerCase().includes(q)||(p.address||'').toLowerCase().includes(q))&&(!stage||p.pipeline_stage===stage)&&(!prio||p.priority_label===prio)));
 }
 
 function renderKanban() {
@@ -771,7 +770,6 @@ async function loadCampaigns() {
   `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Aucune campagne</td></tr>';
 }
 
-async function enrichPlace(placeId,apiKey){const WORKER='https://snowy-snowflake-ac4demail-scraper.adrien49-royer.workers.dev/?url=';try{const url='https://maps.googleapis.com/maps/api/place/details/json?place_id='+placeId+'&fields=formatted_phone_number,website&language=fr&key='+apiKey;const r=await fetch(PROXY+encodeURIComponent(url));const d=await r.json();const det=d.result||{};const phone=det.formatted_phone_number||null;const website=det.website||null;let email=null;if(website){try{const re=await fetch(WORKER+encodeURIComponent(website),{signal:AbortSignal.timeout(7000)});const de=await re.json();if(de.emails&&de.emails.length)email=de.emails[0];}catch(e){}}return{phone,website,email};}catch(e){return{phone:null,website:null,email:null};}}
 async function launchScraping() {
   const city = document.getElementById('scrape-city').value.trim();
   const radius = parseInt(document.getElementById('scrape-radius').value);
@@ -803,8 +801,7 @@ async function launchScraping() {
         seen.add(p.place_id);
         const rt=p.rating||0, rv=p.user_ratings_total||0;
         let sc=0; if(rt===0)sc+=7;else if(rt<3.5)sc+=6;else if(rt<4.0)sc+=4;else if(rt<4.3)sc+=2; if(rv===0)sc+=4;else if(rv<10)sc+=3;else if(rv<30)sc+=2;else if(rv<60)sc+=1;
-        const det=await enrichPlace(p.place_id,apiKey,PROXY);
-        const{error}=await db.from('prospects').upsert({campaign_id:camp.id,place_id:p.place_id,name:p.name,address:p.vicinity||'',category:cat,rating:rt,review_count:rv,priority_score:sc,priority_label:sc>=6?'URGENT':sc>=4?'CHAUD':sc>=3?'TIEDE':'OK',pipeline_stage:'to_contact',phone:det.phone||null,website:det.website||null,email:det.email||null},{onConflict:'place_id',ignoreDuplicates:true});
+        const{error}=await db.from('prospects').upsert({campaign_id:camp.id,place_id:p.place_id,name:p.name,address:p.vicinity||'',category:cat,rating:rt,review_count:rv,priority_score:sc,priority_label:sc>=6?'URGENT':sc>=4?'CHAUD':sc>=3?'TIEDE':'OK',pipeline_stage:'to_contact'},{onConflict:'place_id',ignoreDuplicates:true});
         if(!error)totalInserted++;
       }
     } catch(e) { addLog(`  Erreur: ${e.message}`); }
@@ -829,19 +826,6 @@ document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key===
 checkSession();
 
 
-function downloadAuditPDF(){
-  const modal=document.getElementById('modal-audit');
-  const title=document.getElementById('audit-title')?.textContent||'Audit GMB';
-  const content=document.getElementById('audit-content');
-  if(!content){alert('Lancez d\'abord un audit');return;}
-  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+title+'</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#222}h1{color:#2c3e50}h2{color:#34495e;border-bottom:2px solid #eee;padding-bottom:8px}.ok{color:#27ae60}.ko{color:#e74c3c}.score{font-size:48px;font-weight:bold;color:#2c3e50;text-align:center;padding:20px}.criteria{margin:8px 0;padding:8px 12px;background:#f8f9fa;border-radius:4px}@media print{button{display:none}}</style></head><body>'+content.innerHTML+'<br><p style="color:#999;font-size:11px;text-align:center">Rapport g\u00e9n\u00e9r\u00e9 par Local Scan &mdash; '+new Date().toLocaleDateString('fr-FR')+'</p></body></html>';
-  const blob=new Blob([html],{type:'text/html'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download='audit-gmb-'+Date.now()+'.html';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
 async function runPublicAudit(prospectId){
   const p=allProspects.find(x=>x.id===prospectId);
   if(!p){notify("Prospect introuvable",true);return null;}
@@ -915,129 +899,23 @@ function showAuditModal(res){
     html+="</div>";
   });
   html+="<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:.5rem\">";
-  html+="<button class=\"btn btn-sm btn-accent\" onclick=\"genAuditReport('"+p.id+"')\" >G\u00e9n\u00e9rer rapport PDF</button>";
+  html+="<button class=\"btn btn-sm btn-accent\" onclick=\"genAuditReport('"+p.id+"')\" >Generer rapport</button>";
   html+="<button class=\"btn btn-sm\" onclick=\"genDescImprovement('"+p.id+"')\">Ameliorer description</button></div>";
   document.getElementById("audit-modal-body").innerHTML=html;
-  document.getElementById("modal-audit").classList.add("opeasync function genAuditReport(prospectId) {
-  var p = allProspects.find(function(x){return x.id===prospectId;});
-  if (!p) { alert("Prospect introuvable"); return; }
-  var ac = document.getElementById("audit-content");
-  if (!ac || !ac.innerHTML.trim()) { alert("Lancez d'abord un audit GMB."); return; }
-  var auditText = ac.innerText;
-  var old = document.getElementById("rpt-bar");
-  if (old) old.remove();
-  var bar = document.createElement("div");
-  bar.id = "rpt-bar";
-  bar.style.cssText = "margin:12px 0;padding:14px 16px;background:rgba(255,255,255,0.05);border-radius:8px;border:1px solid var(--bs)";
-  var barInner = "";
-  barInner += "<div style='display:flex;justify-content:space-between;margin-bottom:10px'>";
-  barInner += "<span id='rpt-lbl' style='font-size:13px;color:var(--text)'>Preparation...</span>";
-  barInner += "<span id='rpt-pct' style='font-size:13px;font-weight:700;color:#4ade80'>0%</span></div>";
-  barInner += "<div style='background:rgba(255,255,255,0.1);border-radius:4px;height:8px;overflow:hidden'>";
-  barInner += "<div id='rpt-fill' style='height:100%;width:0%;background:linear-gradient(90deg,#4ade80,#22d3ee);border-radius:4px;transition:width 0.4s ease'></div></div>";
-  bar.innerHTML = barInner;
-  ac.insertAdjacentElement("afterend", bar);
-  function sp(pct, lbl) {
-    var f = document.getElementById("rpt-fill");
-    var l = document.getElementById("rpt-lbl");
-    var pe = document.getElementById("rpt-pct");
-    if (f) f.style.width = pct + "%";
-    if (l) l.textContent = lbl;
-    if (pe) pe.textContent = pct + "%";
-  }
-  function delay(ms) { return new Promise(function(r){setTimeout(r, ms);}); }
-  try {
-    sp(10, "Analyse des donnees GMB..."); await delay(400);
-    sp(30, "Generation IA en cours...");
-    var sysPrompt = "Tu es expert en visibilite locale et Google My Business.";
-    sysPrompt += " Genere un rapport professionnel en HTML simple (sans balises html/head/body).";
-    sysPrompt += " Structure: 1) Synthese executive percutante, 2) Points critiques avec impact,";
-    sysPrompt += " 3) Plan action 3 etapes, 4) Potentiel de gain. Balises: h3, p, ul, li, strong. En francais.";
-    var userMsg = "Commerce: " + p.name;
-    userMsg += "\nCategorie: " + (p.category || "N/A");
-    userMsg += "\nScore GMB: " + (p.gmb_score || p.priority_score || "?");
-    userMsg += "\nNote: " + (p.rating || "?");
-    userMsg += "\nAvis: " + (p.review_count || 0);
-    userMsg += "\n\nAudit:\n" + auditText.substring(0, 2000);
-    var res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: sysPrompt,
-        messages: [{role: "user", content: userMsg}]
-      })
-    });
-    sp(65, "Mise en forme..."); await delay(300);
-    if (!res.ok) throw new Error("Erreur API " + res.status);
-    var data = await res.json();
-    var rHtml = (data.content && data.content[0] && data.content[0].text) || "Erreur";
-    sp(80, "Creation du document..."); await delay(400);
-    var dateStr = new Date().toLocaleDateString("fr-FR", {day:"2-digit", month:"long", year:"numeric"});
-    var score = p.gmb_score || p.priority_score || "?";
-    var css = "";
-    css += "*{margin:0;padding:0;box-sizing:border-box}";
-    css += "body{font-family:Arial,sans-serif;color:#1a1a2e}";
-    css += ".cover{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#fff;padding:50px}";
-    css += ".cover h1{font-size:24px;font-weight:700;margin-bottom:6px}";
-    css += ".sub{font-size:14px;color:#94a3b8;margin-bottom:20px}";
-    css += ".meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:20px}";
-    css += ".mi{background:rgba(255,255,255,0.1);padding:12px 18px;border-radius:8px}";
-    css += ".mi .v{font-size:20px;font-weight:700;color:#22d3ee}";
-    css += ".mi .k{font-size:10px;color:#94a3b8;text-transform:uppercase;margin-top:4px}";
-    css += ".body{padding:36px 50px}";
-    css += ".section{margin-bottom:22px;padding:20px;border:1px solid #e5e7eb;border-radius:10px}";
-    css += ".stitle{font-size:10px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #f1f5f9}";
-    css += ".rc h3{font-size:15px;color:#1e40af;margin:14px 0 8px}";
-    css += ".rc p{font-size:13px;line-height:1.7;color:#374151;margin-bottom:8px}";
-    css += ".rc ul{padding-left:18px;margin-bottom:10px}";
-    css += ".rc li{font-size:13px;line-height:1.8;color:#374151}";
-    css += ".footer{background:#f8fafc;padding:16px 50px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;font-size:12px;color:#94a3b8}";
-    css += "@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}";
-    var doc = "<!DOCTYPE html><html lang='fr'><head><meta charset='UTF-8'>";
-    doc += "<title>Rapport GMB - " + p.name + "</title>";
-    doc += "<style>" + css + "</style></head><body>";
-    doc += "<div class='cover'>";
-    doc += "<h1>Rapport Audit Google My Business</h1>";
-    doc += "<div class='sub'>" + p.name + " &mdash; " + dateStr + "</div>";
-    doc += "<div class='meta'>";
-    doc += "<div class='mi'><div class='v'>" + score + "</div><div class='k'>Score GMB</div></div>";
-    doc += "<div class='mi'><div class='v'>" + (p.category || "N/A") + "</div><div class='k'>Categorie</div></div>";
-    doc += "<div class='mi'><div class='v'>" + (p.rating || "-") + "</div><div class='k'>Note</div></div>";
-    doc += "<div class='mi'><div class='v'>" + (p.review_count || 0) + "</div><div class='k'>Avis</div></div>";
-    doc += "</div></div>";
-    doc += "<div class='body'>";
-    doc += "<div class='section'><div class='stitle'>Analyse IA et Recommandations</div>";
-    doc += "<div class='rc'>" + rHtml + "</div></div>";
-    doc += "<div class='section'><div class='stitle'>Detail des criteres GMB audites</div>";
-    doc += ac.innerHTML + "</div>";
-    doc += "</div>";
-    doc += "<div class='footer'><span>Rapport genere par Local Scan</span><span>" + dateStr + "</span></div>";
-    doc += "</body></html>";
-    sp(95, "Telechargement..."); await delay(300);
-    var blob = new Blob([doc], {type: "text/html;charset=utf-8"});
-    var burl = URL.createObjectURL(blob);
-    var a = document.createElement("a");
-    a.href = burl;
-    a.download = "rapport-gmb-" + p.name.replace(/[^a-z0-9]/gi, "-").toLowerCase() + ".html";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(burl);
-    sp(100, "Rapport telecharge ! Ouvrez dans Chrome puis Ctrl+P pour sauvegarder en PDF.");
-    setTimeout(function(){
-      var b = document.getElementById("rpt-bar");
-      if (b) b.style.background = "rgba(74,222,128,0.08)";
-    }, 500);
-    setTimeout(function(){
-      var b = document.getElementById("rpt-bar");
-      if (b) b.remove();
-    }, 6000);
-  } catch(err) {
-    sp(0, "Erreur: " + err.message);
-    console.error("genAuditReport:", err);
-  }
+  document.getElementById("modal-audit").classList.add("open");
+}
+async function genAuditReport(prospectId){
+  const p=allProspects.find(x=>x.id===prospectId);if(!p)return;
+  const details=p.audit_details?JSON.parse(p.audit_details):{};
+  const ko=(details.criteria||[]).filter(c=>!c.ok);
+  const btn=event?.currentTarget;if(btn){btn.textContent="...";btn.disabled=true;}
+  const lines=["Tu es consultant marketing local pour AVANTI a Angers.","Rapport audit GMB pour: "+p.name,"Note: "+(p.rating||"N/A")+"/5 ("+(p.review_count||0)+" avis) | Score: "+p.audit_score+"/100","Points a ameliorer:"].concat(ko.map(c=>"- "+c.label+": "+c.tip)).concat(["","Structure: 1) Synthese, 2) Points forts, 3) Points critiques avec impact, 4) Plan action 30j, 5) Gains estimes. 400 mots max."]);
+  const prompt=lines.join("\n");
+  const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:prompt}]})});
+  const data=await resp.json();const rapport=data.content?.[0]?.text||"Erreur";
+  if(btn){btn.textContent="Generer rapport";btn.disabled=false;}
+  document.getElementById("audit-modal-body").insertAdjacentHTML("beforeend","<div style=\"margin-top:1rem;border:1px solid var(--bs);border-radius:8px;overflow:hidden\"><div style=\"padding:10px 14px;background:var(--bg);font-family:var(--mono);font-size:10px;color:var(--muted);border-bottom:1px solid var(--bs)\">RAPPORT \u2014 "+p.name.toUpperCase()+"</div><div id=\"rapport-txt\" style=\"padding:14px;font-size:13px;line-height:1.6;white-space:pre-wrap\">"+rapport+"</div><div style=\"padding:10px 14px;border-top:1px solid var(--bs)\"><button class=\"btn btn-sm btn-primary\" onclick=\"navigator.clipboard.writeText(document.getElementById('rapport-txt').textContent).then(()=>notify('Copie!'))\">Copier</button></div></div>");
+  notify("Rapport genere!");
 }
 async function genDescImprovement(prospectId){
   const p=allProspects.find(x=>x.id===prospectId);
@@ -1053,7 +931,7 @@ async function genDescImprovement(prospectId){
   <div class="modal" style="max-width:700px">
     <div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div>
     <div class="modal-body" id="audit-modal-body" style="max-height:70vh;overflow-y:auto"></div>
-    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button> <button onclick="downloadAuditPDF()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-size:13px">&#128196; Télécharger PDF</button></div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button></div>
   </div>
 </div>
 
@@ -1061,10 +939,10 @@ async function genDescImprovement(prospectId){
   <div class="modal" style="max-width:700px">
     <div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div>
     <div class="modal-body" id="audit-modal-body" style="max-height:65vh;overflow-y:auto"></div>
-    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button> <button onclick="downloadAuditPDF()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-size:13px">&#128196; Télécharger PDF</button></div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button></div>
   </div>
 </div>
 
-<div class="modal-bg" id="modal-audit"><div class="modal" style="max-width:700px"><div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div><div class="modal-body" id="audit-modal-body" style="max-height:65vh;overflow-y:auto"></div><div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button> <button onclick="downloadAuditPDF()" style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-size:13px">&#128196; Télécharger PDF</button></div></div></div>
+<div class="modal-bg" id="modal-audit"><div class="modal" style="max-width:700px"><div class="modal-head"><span class="modal-title">Audit GMB complet</span><button class="modal-close" onclick="closeModal('modal-audit')">&#xd7;</button></div><div class="modal-body" id="audit-modal-body" style="max-height:65vh;overflow-y:auto"></div><div class="modal-foot"><button class="btn" onclick="closeModal('modal-audit')">Fermer</button></div></div></div>
 </body>
 </html>
