@@ -908,7 +908,7 @@ async function genAuditReport(prospectId) {
   var p = allProspects.find(function(x) { return x.id === prospectId; });
   if (!p) { alert("Prospect introuvable"); return; }
 
-  var ac = document.getElementById("audit-content");
+  var ac = document.getElementById("audit-modal-body");
   if (!ac || !ac.innerHTML.trim()) {
     alert("Lancez d'abord un audit GMB complet avant de generer le rapport.");
     return;
