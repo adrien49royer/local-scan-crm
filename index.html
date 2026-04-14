@@ -410,15 +410,15 @@ const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const STAGES = {
-  to_contact:'À contacter', contacted:'Contacté',
-  demo:'Démo/RDV', negotiation:'Négociation',
-  signed:'Signé', lost:'Perdu'
+  to_contact:'\u00c0 contacter', contacted:'Contact\u00e9',
+  demo:'D\u00e9mo/RDV', negotiation:'N\u00e9gociation',
+  signed:'Sign\u00e9', lost:'Perdu'
 };
 const CATS = {
   restaurant:'Restaurant', hair_care:'Coiffeur', bakery:'Boulangerie',
-  plumber:'Plombier', electrician:'Électricien', car_repair:'Garage',
+  plumber:'Plombier', electrician:'\u00c9lectricien', car_repair:'Garage',
   florist:'Fleuriste', laundry:'Pressing', bar:'Bar',
-  beauty_salon:'Institut beauté', other:'Autre'
+  beauty_salon:'Institut beaut\u00e9', other:'Autre'
 };
 const PRIORITY_BADGE = {
   URGENT:'badge-urgent', CHAUD:'badge-chaud',
@@ -442,7 +442,7 @@ async function login() {
   const { data, error } = await db.auth.signInWithPassword({ email, password: pass });
   if (error) {
     document.getElementById('auth-err').textContent = 'Email ou mot de passe incorrect';
-    document.getElementById('login-btn').textContent = 'Se connecter →';
+    document.getElementById('login-btn').textContent = 'Se connecter \u2192';
     return;
   }
   currentUser = data.user;
@@ -500,9 +500,9 @@ async function loadDashboard() {
   document.getElementById('dash-prospects').innerHTML = top.map(p => `
     <tr onclick="openFiche('${p.id}')" style="cursor:pointer">
       <td><strong>${p.name}</strong></td>
-      <td>${CATS[p.category]||p.category||'—'}</td>
+      <td>${CATS[p.category]||p.category||'\u2014'}</td>
       <td><span class="badge ${PRIORITY_BADGE[p.priority_label]||'badge-gray'}">${p.priority_label}</span></td>
-      <td><button class="btn btn-sm" onclick="event.stopPropagation();openFiche('${p.id}')">Voir →</button></td>
+      <td><button class="btn btn-sm" onclick="event.stopPropagation();openFiche('${p.id}')">Voir \u2192</button></td>
     </tr>
   `).join('');
   const { data: acts } = await db.from('activities').select('*').order('created_at', {ascending:false}).limit(6);
@@ -529,12 +529,12 @@ function renderProspects(list) {
     <tr>
       <td style="color:var(--muted);font-family:var(--mono)">${i+1}</td>
       <td><strong style="cursor:pointer;color:var(--accent)" onclick="openFiche('${p.id}')">${p.name}</strong></td>
-      <td>${CATS[p.category]||p.category||'—'}</td>
-      <td>${p.rating>0?p.rating+'★':'—'}</td>
-      <td>${p.review_count||0}</td><td style="font-size:11px;color:#aaa">${p.phone||''}</td><td style="font-size:11px">${p.email?'<a href="mailto:'+p.email+'" style="color:#4ade80">✉ '+p.email.split('@')[0]+'</a>':''}</td>
+      <td>${CATS[p.category]||p.category||'\u2014'}</td>
+      <td>${p.rating>0?p.rating+'\u2605':'\u2014'}</td>
+      <td>${p.review_count||0}</td><td style="font-size:11px;color:#aaa">${p.phone||''}</td><td style="font-size:11px">${p.email?'<a href="mailto:'+p.email+'" style="color:#4ade80">\u2709 '+p.email.split('@')[0]+'</a>':''}</td>
       <td><span class="badge ${PRIORITY_BADGE[p.priority_label]||'badge-gray'}">${p.priority_label||'OK'}</span></td>
       <td><span class="badge ${STAGE_BADGE[p.pipeline_stage]||'badge-gray'}">${STAGES[p.pipeline_stage]||p.pipeline_stage}</span></td>
-      <td style="color:var(--muted);font-size:12px">—</td>
+      <td style="color:var(--muted);font-size:12px">\u2014</td>
       <td><div class="score-circle ${p.priority_score>=6?'score-hi':p.priority_score>=4?'score-md':'score-lo'}">${p.priority_score||0}</div></td>
       <td><button class="btn btn-sm" onclick="openFiche('${p.id}')">Voir</button> <button class="btn btn-sm" onclick="openProspectModal('${p.id}')">Edit</button></td>
     </tr>
@@ -562,7 +562,7 @@ function renderKanban() {
           ${cards.slice(0,10).map(p => `
             <div class="k-card" onclick="openFiche('${p.id}')">
               <div class="k-name">${p.name}</div>
-              <div class="k-meta">${CATS[p.category]||p.category||'—'} · <span class="badge ${PRIORITY_BADGE[p.priority_label]||'badge-gray'}" style="font-size:9px">${p.priority_label}</span></div>
+              <div class="k-meta">${CATS[p.category]||p.category||'\u2014'} \u00b7 <span class="badge ${PRIORITY_BADGE[p.priority_label]||'badge-gray'}" style="font-size:9px">${p.priority_label}</span></div>
             </div>
           `).join('')}
           ${cards.length > 10 ? `<div style="font-size:11px;color:var(--muted);text-align:center;padding:4px">+${cards.length-10} autres</div>` : ''}
@@ -577,7 +577,7 @@ async function openFiche(id) {
   const p = allProspects.find(x => x.id === id);
   if (!p) return;
   document.getElementById('fiche-title').textContent = p.name;
-  // Ajouter les coordonnées dans l'en-tête de la fiche si dispo
+  // Ajouter les coordonn\u00e9es dans l'en-t\u00eate de la fiche si dispo
   const coordHtml = [p.phone?'<a href="tel:'+p.phone+'" style="color:var(--accent);font-size:13px;text-decoration:none">&#128222; '+p.phone+'</a>':'',p.email?'<a href="mailto:'+p.email+'" style="color:var(--accent);font-size:13px;text-decoration:none">&#9993; '+p.email+'</a>':'',p.website?'<a href="'+p.website+'" target="_blank" style="color:var(--muted);font-size:12px;text-decoration:none">&#127760; Site web</a>':''].filter(Boolean).join(' &nbsp; ');
   if(coordHtml) document.getElementById('fiche-coords')?.remove(), document.querySelector('#modal-fiche .modal-body')?.insertAdjacentHTML('afterbegin','<div id="fiche-coords" style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--bd);margin-bottom:4px">'+coordHtml+'</div>');
   const { data: acts } = await db.from('activities').select('*').eq('prospect_id', id).order('created_at', {ascending:false}).limit(10);
@@ -587,11 +587,11 @@ async function openFiche(id) {
       <div>
         <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">INFOS</div>
         <table style="font-size:13px;width:100%">
-          <tr><td style="color:var(--muted);padding:3px 0;width:110px">Catégorie</td><td>${CATS[p.category]||p.category||'—'}</td></tr>
-          <tr><td style="color:var(--muted);padding:3px 0">Adresse</td><td>${p.address||'—'}</td></tr>
-          <tr><td style="color:var(--muted);padding:3px 0">Téléphone</td><td>${p.phone||'—'}</td></tr>
-          <tr><td style="color:var(--muted);padding:3px 0">Site web</td><td>${p.website?`<a href="${p.website}" target="_blank" style="color:var(--accent)">${p.website}</a>`:'—'}</td></tr>
-          <tr><td style="color:var(--muted);padding:3px 0">Note Google</td><td>${p.rating>0?p.rating+'★':'—'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0;width:110px">Cat\u00e9gorie</td><td>${CATS[p.category]||p.category||'\u2014'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Adresse</td><td>${p.address||'\u2014'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">T\u00e9l\u00e9phone</td><td>${p.phone||'\u2014'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Site web</td><td>${p.website?`<a href="${p.website}" target="_blank" style="color:var(--accent)">${p.website}</a>`:'\u2014'}</td></tr>
+          <tr><td style="color:var(--muted);padding:3px 0">Note Google</td><td>${p.rating>0?p.rating+'\u2605':'\u2014'}</td></tr>
           <tr><td style="color:var(--muted);padding:3px 0">Avis</td><td>${p.review_count||0}</td></tr>
           <tr><td style="color:var(--muted);padding:3px 0">Stade</td><td>
             <select onchange="updateStage('${p.id}',this.value)" style="font-size:12px;padding:3px 6px">
@@ -603,20 +603,20 @@ async function openFiche(id) {
       <div>
         <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">SCORE GMB</div>
         <div style="font-size:42px;font-weight:500;color:${(p.audit_score||0)>=70?'var(--accent)':(p.audit_score||0)>=45?'#EF9F27':'var(--warn)'}">
-          ${p.audit_score!=null?p.audit_score+'<span style="font-size:16px;color:var(--muted)">/100</span>':'—'}
+          ${p.audit_score!=null?p.audit_score+'<span style="font-size:16px;color:var(--muted)">/100</span>':'\u2014'}
         </div>
         ${p.notes?`<div style="margin-top:10px"><div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:4px">NOTES</div><div style="font-size:13px;background:var(--bg);padding:8px 10px;border-radius:6px">${p.notes}</div></div>`:''}
       </div>
     </div>
-    ${p.offer_text?`<div><div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px">OFFRE GÉNÉRÉE</div><div style="font-size:12px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;max-height:160px;overflow-y:auto">${p.offer_text}</div></div>`:''}
+    ${p.offer_text?`<div><div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px">OFFRE G\u00c9N\u00c9R\u00c9E</div><div style="font-size:12px;background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;max-height:160px;overflow-y:auto">${p.offer_text}</div></div>`:''}
     <div>
-      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px">ACTIVITÉ (${(acts||[]).length})</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:5px">ACTIVIT\u00c9 (${(acts||[]).length})</div>
       <div class="activity-list">${(acts||[]).length?acts.map(a=>`
         <div class="act-item" style="padding:7px 10px">
           <div class="act-dot act-dot-${dotColor[a.type]||'blue'}"></div>
           <div class="act-content"><div class="act-text">${a.content||a.type}</div><div class="act-time">${new Date(a.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div></div>
         </div>
-      `).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px">Aucune activité encore.</div>'}
+      `).join(''):'<div style="color:var(--muted);font-size:13px;padding:8px">Aucune activit\u00e9 encore.</div>'}
       </div>
     </div>
     <div style="display:flex;gap:8px">
@@ -630,10 +630,10 @@ async function openFiche(id) {
 
 async function updateStage(id, stage) {
   await db.from('prospects').update({ pipeline_stage: stage, updated_at: new Date() }).eq('id', id);
-  await db.from('activities').insert({ prospect_id: id, user_id: currentUser.id, type: 'stage_change', content: `Stade changé → ${STAGES[stage]}` });
+  await db.from('activities').insert({ prospect_id: id, user_id: currentUser.id, type: 'stage_change', content: `Stade chang\u00e9 \u2192 ${STAGES[stage]}` });
   const p = allProspects.find(x => x.id === id);
   if (p) p.pipeline_stage = stage;
-  notify('Stade mis à jour');
+  notify('Stade mis \u00e0 jour');
 }
 
 async function addActivity() {
@@ -650,7 +650,7 @@ async function moveToSigned() {
   const p = allProspects.find(x => x.id === currentProspectId);
   if (p) {
     await db.from('clients').insert({ prospect_id: p.id, place_id: p.place_id, name: p.name, category: p.category, address: p.address, phone: p.phone, contract_start: new Date().toISOString().split('T')[0], status: 'active', assigned_to: currentUser.id });
-    notify('✓ Client créé !');
+    notify('\u2713 Client cr\u00e9\u00e9 !');
   }
   closeModal('modal-fiche');
   loadDashboard();
@@ -660,7 +660,7 @@ async function moveToSigned() {
 async function generateAudit() {
   const p = allProspects.find(x => x.id === currentProspectId);
   if (!p) return;
-  document.getElementById('audit-btn').innerHTML = '<span class="loading-spinner"></span>Génération...';
+  document.getElementById('audit-btn').innerHTML = '<span class="loading-spinner"></span>G\u00e9n\u00e9ration...';
   document.getElementById('audit-btn').disabled = true;
   let score = 0;
   if (p.rating >= 4.3) score += 20; else if (p.rating >= 3.5) score += 10;
@@ -669,30 +669,30 @@ async function generateAudit() {
   if (p.website) score += 5;
   score += 5;
   await db.from('prospects').update({ audit_score: score, updated_at: new Date() }).eq('id', p.id);
-  await db.from('activities').insert({ prospect_id: p.id, user_id: currentUser.id, type: 'audit', content: `Audit GMB généré — Score: ${score}/100` });
+  await db.from('activities').insert({ prospect_id: p.id, user_id: currentUser.id, type: 'audit', content: `Audit GMB g\u00e9n\u00e9r\u00e9 \u2014 Score: ${score}/100` });
   p.audit_score = score;
-  document.getElementById('audit-btn').innerHTML = 'Générer l\'audit GMB';
+  document.getElementById('audit-btn').innerHTML = 'G\u00e9n\u00e9rer l\'audit GMB';
   document.getElementById('audit-btn').disabled = false;
-  notify(`Audit généré : ${score}/100`);
+  notify(`Audit g\u00e9n\u00e9r\u00e9 : ${score}/100`);
   openFiche(currentProspectId);
 }
 
 async function generateOffer() {
   const p = allProspects.find(x => x.id === currentProspectId);
   if (!p) return;
-  document.getElementById('offer-btn').innerHTML = '<span class="loading-spinner"></span>Génération...';
+  document.getElementById('offer-btn').innerHTML = '<span class="loading-spinner"></span>G\u00e9n\u00e9ration...';
   document.getElementById('offer-btn').disabled = true;
   try {
-    const prompt = `Tu es consultant marketing local pour l'agence AVANTI à Angers. Génère une offre commerciale (15 lignes max) pour :\nCommerce : ${p.name}\nCatégorie : ${CATS[p.category]||p.category}\nAdresse : ${p.address||'Angers'}\nNote : ${p.rating||'?'}/5 | Avis : ${p.review_count||0} | Site : ${p.website?'Oui':'Non'} | Score GMB : ${p.audit_score!=null?p.audit_score+'/100':'non calculé'}\nL'offre : accroche problème, 3 actions concrètes, tarif 150-350€/mois, appel à l'action. Ton direct.`;
+    const prompt = `Tu es consultant marketing local pour l'agence AVANTI \u00e0 Angers. G\u00e9n\u00e8re une offre commerciale (15 lignes max) pour :\nCommerce : ${p.name}\nCat\u00e9gorie : ${CATS[p.category]||p.category}\nAdresse : ${p.address||'Angers'}\nNote : ${p.rating||'?'}/5 | Avis : ${p.review_count||0} | Site : ${p.website?'Oui':'Non'} | Score GMB : ${p.audit_score!=null?p.audit_score+'/100':'non calcul\u00e9'}\nL'offre : accroche probl\u00e8me, 3 actions concr\u00e8tes, tarif 150-350\u20ac/mois, appel \u00e0 l'action. Ton direct.`;
     const resp = await fetch(CLAUDE_API, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]}) });
     const data = await resp.json();
     const txt = data.content?.[0]?.text || 'Erreur';
     await db.from('prospects').update({ offer_text: txt, updated_at: new Date() }).eq('id', p.id);
-    await db.from('activities').insert({ prospect_id: p.id, user_id: currentUser.id, type: 'offer', content: 'Offre générée par Claude' });
+    await db.from('activities').insert({ prospect_id: p.id, user_id: currentUser.id, type: 'offer', content: 'Offre g\u00e9n\u00e9r\u00e9e par Claude' });
     p.offer_text = txt;
-    notify('Offre générée !');
+    notify('Offre g\u00e9n\u00e9r\u00e9e !');
   } catch(e) { notify('Erreur API', true); }
-  document.getElementById('offer-btn').innerHTML = 'Générer l\'offre';
+  document.getElementById('offer-btn').innerHTML = 'G\u00e9n\u00e9rer l\'offre';
   document.getElementById('offer-btn').disabled = false;
   openFiche(currentProspectId);
 }
@@ -734,8 +734,8 @@ async function saveProspect() {
   if (!document.getElementById('p-website').value) score += 2;
   const label = score >= 6 ? 'URGENT' : score >= 4 ? 'CHAUD' : score >= 3 ? 'TIEDE' : 'OK';
   const payload = { name, category: document.getElementById('p-cat').value, phone: document.getElementById('p-phone').value, address: document.getElementById('p-address').value, website: document.getElementById('p-website').value, rating, review_count: reviews, pipeline_stage: document.getElementById('p-stage').value, notes: document.getElementById('p-notes').value, priority_score: score, priority_label: label, updated_at: new Date() };
-  if (currentProspectId) { await db.from('prospects').update(payload).eq('id', currentProspectId); notify('Prospect mis à jour'); }
-  else { await db.from('prospects').insert(payload); notify('Prospect ajouté'); }
+  if (currentProspectId) { await db.from('prospects').update(payload).eq('id', currentProspectId); notify('Prospect mis \u00e0 jour'); }
+  else { await db.from('prospects').insert(payload); notify('Prospect ajout\u00e9'); }
   closeModal('modal-prospect');
   await loadProspects();
   loadDashboard();
@@ -746,17 +746,17 @@ async function loadClients() {
   document.getElementById('clients-grid').innerHTML = (data||[]).length ? (data||[]).map(c => `
     <div class="client-card">
       <div class="client-name">${c.name}</div>
-      <div class="client-cat">${CATS[c.category]||c.category||'—'} · ${c.address||'Angers'}</div>
-      <div class="client-score">—</div>
+      <div class="client-cat">${CATS[c.category]||c.category||'\u2014'} \u00b7 ${c.address||'Angers'}</div>
+      <div class="client-score">\u2014</div>
       <div style="font-size:12px;color:var(--muted)">Score GMB actuel</div>
       <div class="client-actions">
         <button class="btn btn-sm" onclick="notify('Rapport mensuel en cours...')">Rapport mensuel</button><button class="btn btn-sm btn-accent" onclick="openProspectAudit(allProspects.find(x=>x.prospect_id===c.id)?.id||c.prospect_id)">Audit GMB</button>
         <button class="btn btn-sm btn-accent" onclick="openProspectAudit(allProspects.find(x=>x.prospect_id===c.id)?.id||c.prospect_id)">Audit GMB</button>
-        ${!c.google_access_token?`<button class="btn btn-sm btn-accent" onclick="connectGMB('"'+c.id+'"')">Connecter GMB</button>`:'<span style="font-size:11px;color:var(--accent)">✓ GMB connecté</span>'}
+        ${!c.google_access_token?`<button class="btn btn-sm btn-accent" onclick="connectGMB('"'+c.id+'"')">Connecter GMB</button>`:'<span style="font-size:11px;color:var(--accent)">\u2713 GMB connect\u00e9</span>'}
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px">Client depuis ${new Date(c.created_at).toLocaleDateString('fr-FR')}</div>
     </div>
-  `).join('') : `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:3rem;font-size:14px">Aucun client actif.<br>Marquez un prospect comme "Signé" pour créer un client.</div>`;
+  `).join('') : `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:3rem;font-size:14px">Aucun client actif.<br>Marquez un prospect comme "Sign\u00e9" pour cr\u00e9er un client.</div>`;
 }
 
 async function loadCampaigns() {
@@ -777,27 +777,27 @@ async function launchScraping() {
   const radius = parseInt(document.getElementById('scrape-radius').value);
   const apiKey = document.getElementById('scrape-apikey').value.trim();
   if (!city) { notify('Entrez une ville', true); return; }
-  if (!apiKey) { notify('Clé API Google requise', true); return; }
+  if (!apiKey) { notify('Cl\u00e9 API Google requise', true); return; }
   document.getElementById('scrape-btn').disabled = true;
   document.getElementById('scrape-progress').style.display = 'block';
   const log = document.getElementById('progress-log'), bar = document.getElementById('progress-bar'), status = document.getElementById('scrape-status');
   log.innerHTML = '';
-  const { data: camp } = await db.from('campaigns').insert({ name: `${city} — ${new Date().toLocaleDateString('fr-FR')}`, city, radius_km: radius, status: 'running', created_by: currentUser.id }).select().single();
+  const { data: camp } = await db.from('campaigns').insert({ name: `${city} \u2014 ${new Date().toLocaleDateString('fr-FR')}`, city, radius_km: radius, status: 'running', created_by: currentUser.id }).select().single();
   const CATEGORIES = ['restaurant','hair_care','bakery','plumber','electrician','car_repair','florist','bar','beauty_salon','laundry'];
   const seen = new Set(); let totalInserted = 0;
   function addLog(msg) { log.innerHTML += msg + '\n'; log.scrollTop = log.scrollHeight; }
-  addLog(`Géocodage de "${city}"...`);
+  addLog(`G\u00e9ocodage de "${city}"...`);
   let lat = 47.4784, lng = -0.5632;
-  try { const geoResp = await fetch(PROXY + encodeURIComponent(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(city+',France')}&key=${apiKey}`)); const geoData = await geoResp.json(); if (geoData.results?.[0]?.geometry) { lat = geoData.results[0].geometry.location.lat; lng = geoData.results[0].geometry.location.lng; addLog(`Coords: ${lat.toFixed(4)}, ${lng.toFixed(4)}`); } } catch(e) { addLog('Géocodage échoué'); }
+  try { const geoResp = await fetch(PROXY + encodeURIComponent(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(city+',France')}&key=${apiKey}`)); const geoData = await geoResp.json(); if (geoData.results?.[0]?.geometry) { lat = geoData.results[0].geometry.location.lat; lng = geoData.results[0].geometry.location.lng; addLog(`Coords: ${lat.toFixed(4)}, ${lng.toFixed(4)}`); } } catch(e) { addLog('G\u00e9ocodage \u00e9chou\u00e9'); }
   for (let i = 0; i < CATEGORIES.length; i++) {
     const cat = CATEGORIES[i];
-    status.textContent = `Scraping ${i+1}/${CATEGORIES.length} — ${CATS[cat]||cat}...`;
+    status.textContent = `Scraping ${i+1}/${CATEGORIES.length} \u2014 ${CATS[cat]||cat}...`;
     bar.style.width = ((i / CATEGORIES.length) * 80) + '%';
-    addLog(`→ ${CATS[cat]||cat}...`);
+    addLog(`\u2192 ${CATS[cat]||cat}...`);
     try {
       const resp = await fetch(PROXY + encodeURIComponent(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius*1000}&type=${cat}&language=fr&key=${apiKey}`));
       const data = await resp.json(); const results = data.results || [];
-      addLog(`  ${results.length} résultats`);
+      addLog(`  ${results.length} r\u00e9sultats`);
       for (const p of results) {
         if (seen.has(p.place_id)) continue;
         seen.add(p.place_id);
@@ -812,10 +812,10 @@ async function launchScraping() {
   }
   await db.from('campaigns').update({ status: 'done', total_scraped: totalInserted, completed_at: new Date() }).eq('id', camp.id);
   bar.style.width = '100%';
-  status.textContent = `✓ Terminé — ${totalInserted} prospects importés`;
+  status.textContent = `\u2713 Termin\u00e9 \u2014 ${totalInserted} prospects import\u00e9s`;
   addLog(`\nTotal: ${totalInserted} prospects`);
   document.getElementById('scrape-btn').disabled = false;
-  notify(`Scraping terminé : ${totalInserted} prospects`);
+  notify(`Scraping termin\u00e9 : ${totalInserted} prospects`);
   await loadProspects(); await loadCampaigns(); loadDashboard();
 }
 
@@ -823,7 +823,7 @@ function connectGMB(id){window.open(GMB_OAUTH_URL+'&state='+encodeURIComponent(i
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function notify(msg,err=false){const n=document.getElementById('notif');n.textContent=msg;n.style.background=err?'var(--warn)':'#1C1C1A';n.classList.add('show');setTimeout(()=>n.classList.remove('show'),3000);}
-function copyToClipboard(text){navigator.clipboard.writeText(text).then(()=>notify('Copié !'));}
+function copyToClipboard(text){navigator.clipboard.writeText(text).then(()=>notify('Copi\u00e9 !'));}
 document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});});
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 checkSession();
@@ -834,7 +834,7 @@ function downloadAuditPDF(){
   const title=document.getElementById('audit-title')?.textContent||'Audit GMB';
   const content=document.getElementById('audit-content');
   if(!content){alert('Lancez d\'abord un audit');return;}
-  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+title+'</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#222}h1{color:#2c3e50}h2{color:#34495e;border-bottom:2px solid #eee;padding-bottom:8px}.ok{color:#27ae60}.ko{color:#e74c3c}.score{font-size:48px;font-weight:bold;color:#2c3e50;text-align:center;padding:20px}.criteria{margin:8px 0;padding:8px 12px;background:#f8f9fa;border-radius:4px}@media print{button{display:none}}</style></head><body>'+content.innerHTML+'<br><p style="color:#999;font-size:11px;text-align:center">Rapport généré par Local Scan &mdash; '+new Date().toLocaleDateString('fr-FR')+'</p></body></html>';
+  const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+title+'</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#222}h1{color:#2c3e50}h2{color:#34495e;border-bottom:2px solid #eee;padding-bottom:8px}.ok{color:#27ae60}.ko{color:#e74c3c}.score{font-size:48px;font-weight:bold;color:#2c3e50;text-align:center;padding:20px}.criteria{margin:8px 0;padding:8px 12px;background:#f8f9fa;border-radius:4px}@media print{button{display:none}}</style></head><body>'+content.innerHTML+'<br><p style="color:#999;font-size:11px;text-align:center">Rapport g\u00e9n\u00e9r\u00e9 par Local Scan &mdash; '+new Date().toLocaleDateString('fr-FR')+'</p></body></html>';
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -865,16 +865,16 @@ async function runPublicAudit(prospectId){
     {label:"Horaires speciaux",cat:"Completude",score:det.opening_hours?.special_hours?.length?5:0,max:5,ok:!!det.opening_hours?.special_hours?.length,tip:"Ajouter les horaires jours feries"},
     {label:"Categorie principale",cat:"Completude",score:types.length>0?5:0,max:5,ok:types.length>0,tip:"Verifier la categorie principale"},
     {label:"Categories secondaires",cat:"Completude",score:types.length>2?5:types.length>1?3:0,max:5,ok:types.length>2,tip:"Ajouter des categories secondaires"},
-    {label:"Description (150+)",cat:"Contenu",score:desc>150?10:desc>50?6:desc>0?3:0,max:10,ok:desc>150,tip:"Description avec mots-cles ("+desc+" car. — 150+ requis)"},
+    {label:"Description (150+)",cat:"Contenu",score:desc>150?10:desc>50?6:desc>0?3:0,max:10,ok:desc>150,tip:"Description avec mots-cles ("+desc+" car. \u2014 150+ requis)"},
     {label:"Photos (10+)",cat:"Contenu",score:photos>=10?10:photos>=5?6:photos>=1?3:0,max:10,ok:photos>=10,tip:"Ajouter photos facade/interieur/equipe ("+photos+" actuellement)"},
-    {label:"Note Google (4+)",cat:"Reputation",score:rating>=4.5?10:rating>=4.0?7:rating>=3.5?4:rating>0?2:0,max:10,ok:rating>=4.0,tip:"Note: "+(rating||"N/A")+"/5 — Encourager les clients satisfaits"},
-    {label:"Volume avis (50+)",cat:"Reputation",score:reviewCount>=100?10:reviewCount>=50?7:reviewCount>=20?4:reviewCount>=5?2:0,max:10,ok:reviewCount>=50,tip:reviewCount+" avis — Mettre en place une strategie de collecte"},
+    {label:"Note Google (4+)",cat:"Reputation",score:rating>=4.5?10:rating>=4.0?7:rating>=3.5?4:rating>0?2:0,max:10,ok:rating>=4.0,tip:"Note: "+(rating||"N/A")+"/5 \u2014 Encourager les clients satisfaits"},
+    {label:"Volume avis (50+)",cat:"Reputation",score:reviewCount>=100?10:reviewCount>=50?7:reviewCount>=20?4:reviewCount>=5?2:0,max:10,ok:reviewCount>=50,tip:reviewCount+" avis \u2014 Mettre en place une strategie de collecte"},
     {label:"Reponses aux avis",cat:"Reputation",score:reviews.length>0?5:0,max:5,ok:reviews.length>0,tip:"Repondre a chaque avis"},
     {label:"Fiche operationnelle",cat:"Technique",score:det.business_status==="OPERATIONAL"?5:0,max:5,ok:det.business_status==="OPERATIONAL",tip:"Statut: "+(det.business_status||"inconnu")}
   ];
   const score=Math.round(criteria.reduce((s,c)=>s+c.score,0)/criteria.reduce((s,c)=>s+c.max,0)*100);
   await db.from("prospects").update({audit_score:score,audit_details:JSON.stringify({criteria,audited_at:new Date().toISOString()}),updated_at:new Date()}).eq("id",prospectId);
-  await db.from("activities").insert({prospect_id:prospectId,user_id:currentUser.id,type:"audit",content:"Audit GMB "+score+"/100 — "+criteria.filter(c=>!c.ok).length+" points a corriger"});
+  await db.from("activities").insert({prospect_id:prospectId,user_id:currentUser.id,type:"audit",content:"Audit GMB "+score+"/100 \u2014 "+criteria.filter(c=>!c.ok).length+" points a corriger"});
   const idx=allProspects.findIndex(x=>x.id===prospectId);
   if(idx>=0)allProspects[idx].audit_score=score;
   return{score,criteria,det,p};
@@ -904,7 +904,7 @@ function showAuditModal(res){
   html+="<div style=\"font-size:11px;color:var(--muted);margin-top:2px\">"+(det.photos?.length||0)+" photos</div></div></div>";
   cats.forEach(cat=>{
     const items=criteria.filter(c=>c.cat===cat);
-    html+="<div style=\"margin-bottom:.75rem\"><div style=\"font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid var(--bd)\">"+cat.toUpperCase()+" — "+items.filter(c=>c.ok).length+"/"+items.length+" OK</div>";
+    html+="<div style=\"margin-bottom:.75rem\"><div style=\"font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--muted);margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid var(--bd)\">"+cat.toUpperCase()+" \u2014 "+items.filter(c=>c.ok).length+"/"+items.length+" OK</div>";
     items.forEach(c=>{
       html+="<div style=\"display:flex;align-items:flex-start;gap:10px;padding:7px 10px;background:"+(c.ok?"#EAF3DE":"#FCEBEB")+";border-radius:7px;margin-bottom:3px\">";
       html+="<span style=\"font-size:13px;margin-top:1px\">"+(c.ok?"&#10003;":"&#10007;")+"</span>";
@@ -915,7 +915,7 @@ function showAuditModal(res){
     html+="</div>";
   });
   html+="<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:.5rem\">";
-  html+="<button class=\"btn btn-sm btn-accent\" onclick=\"genAuditReport('"+p.id+"')\" >Générer rapport PDF</button>";
+  html+="<button class=\"btn btn-sm btn-accent\" onclick=\"genAuditReport('"+p.id+"')\" >G\u00e9n\u00e9rer rapport PDF</button>";
   html+="<button class=\"btn btn-sm\" onclick=\"genDescImprovement('"+p.id+"')\">Ameliorer description</button></div>";
   document.getElementById("audit-modal-body").innerHTML=html;
   document.getElementById("modal-audit").classList.add("opeasync function genAuditReport(prospectId) {
