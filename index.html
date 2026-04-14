@@ -904,19 +904,317 @@ function showAuditModal(res){
   document.getElementById("audit-modal-body").innerHTML=html;
   document.getElementById("modal-audit").classList.add("open");
 }
-async function genAuditReport(prospectId){
-  const p=allProspects.find(x=>x.id===prospectId);if(!p)return;
-  const details=p.audit_details?JSON.parse(p.audit_details):{};
-  const ko=(details.criteria||[]).filter(c=>!c.ok);
-  const btn=event?.currentTarget;if(btn){btn.textContent="...";btn.disabled=true;}
-  const lines=["Tu es consultant marketing local pour AVANTI a Angers.","Rapport audit GMB pour: "+p.name,"Note: "+(p.rating||"N/A")+"/5 ("+(p.review_count||0)+" avis) | Score: "+p.audit_score+"/100","Points a ameliorer:"].concat(ko.map(c=>"- "+c.label+": "+c.tip)).concat(["","Structure: 1) Synthese, 2) Points forts, 3) Points critiques avec impact, 4) Plan action 30j, 5) Gains estimes. 400 mots max."]);
-  const prompt=lines.join("\n");
-  const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:prompt}]})});
-  const data=await resp.json();const rapport=data.content?.[0]?.text||"Erreur";
-  if(btn){btn.textContent="Generer rapport";btn.disabled=false;}
-  document.getElementById("audit-modal-body").insertAdjacentHTML("beforeend","<div style=\"margin-top:1rem;border:1px solid var(--bs);border-radius:8px;overflow:hidden\"><div style=\"padding:10px 14px;background:var(--bg);font-family:var(--mono);font-size:10px;color:var(--muted);border-bottom:1px solid var(--bs)\">RAPPORT \u2014 "+p.name.toUpperCase()+"</div><div id=\"rapport-txt\" style=\"padding:14px;font-size:13px;line-height:1.6;white-space:pre-wrap\">"+rapport+"</div><div style=\"padding:10px 14px;border-top:1px solid var(--bs)\"><button class=\"btn btn-sm btn-primary\" onclick=\"navigator.clipboard.writeText(document.getElementById('rapport-txt').textContent).then(()=>notify('Copie!'))\">Copier</button></div></div>");
-  notify("Rapport genere!");
+async function genAuditReport(prospectId) {
+  var p = allProspects.find(function(x) { return x.id === prospectId; });
+  if (!p) { alert("Prospect introuvable"); return; }
+
+  var ac = document.getElementById("audit-content");
+  if (!ac || !ac.innerHTML.trim()) {
+    alert("Lancez d'abord un audit GMB complet avant de generer le rapport.");
+    return;
+  }
+
+  // Recuperer les donnees de l'audit depuis le DOM
+  var auditText = ac.innerText;
+  var scoreEl = ac.querySelector(".audit-score-value, [data-score]");
+  var auditScore = scoreEl ? scoreEl.textContent.trim() : (p.gmb_score || p.priority_score || "?");
+
+  // Afficher la barre de progression
+  var old = document.getElementById("rpt-bar");
+  if (old) old.remove();
+  var bar = document.createElement("div");
+  bar.id = "rpt-bar";
+  bar.style.cssText = "margin:14px 0;padding:16px;background:rgba(255,255,255,0.05);border-radius:10px;border:1px solid var(--bs)";
+  var hi = "";
+  hi += "<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px'>";
+  hi += "<span id='rpt-lbl' style='font-size:13px;color:var(--text);font-weight:500'>Preparation du rapport...</span>";
+  hi += "<span id='rpt-pct' style='font-size:13px;font-weight:700;color:#4ade80;min-width:40px;text-align:right'>0%</span></div>";
+  hi += "<div style='background:rgba(255,255,255,0.08);border-radius:6px;height:10px;overflow:hidden'>";
+  hi += "<div id='rpt-fill' style='height:100%;width:0%;background:linear-gradient(90deg,#4ade80,#22d3ee);border-radius:6px;transition:width 0.5s ease'></div></div>";
+  bar.innerHTML = hi;
+  ac.insertAdjacentElement("afterend", bar);
+
+  function sp(pct, lbl) {
+    var f = document.getElementById("rpt-fill");
+    var l = document.getElementById("rpt-lbl");
+    var pe = document.getElementById("rpt-pct");
+    if (f) f.style.width = pct + "%";
+    if (l) l.textContent = lbl;
+    if (pe) pe.textContent = pct + "%";
+  }
+  function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+  try {
+    sp(10, "Analyse GMB du prospect en cours...");
+    await delay(400);
+    sp(25, "Generation de l'analyse IA...");
+
+    var sysPrompt = "Tu es expert en visibilite locale et Google My Business. ";
+    sysPrompt += "Genere une analyse en HTML simple (sans balises html/head/body). ";
+    sysPrompt += "Structure OBLIGATOIRE : ";
+    sysPrompt += "1) <h3>Synthese executive</h3> (2-3 phrases percutantes sur l'etat GMB), ";
+    sysPrompt += "2) <h3>Points critiques a corriger</h3> (liste <ul> avec impact estime par point), ";
+    sysPrompt += "3) <h3>Plan d'action prioritaire</h3> (3 etapes concretes numerotees), ";
+    sysPrompt += "4) <h3>Potentiel de gain</h3> (estimation gain visibilite si corrections appliquees). ";
+    sysPrompt += "Sois direct, oriente action, en francais.";
+
+    var userMsg = "Commerce : " + p.name + "\n";
+    userMsg += "Categorie : " + (p.category || "N/A") + "\n";
+    userMsg += "Note Google : " + (p.rating || "?") + "/5\n";
+    userMsg += "Nombre d'avis : " + (p.review_count || 0) + "\n";
+    userMsg += "Score GMB : " + auditScore + "/100\n";
+    userMsg += "Adresse : " + (p.address || "N/A") + "\n\n";
+    userMsg += "Resultats de l'audit GMB :\n" + auditText.substring(0, 2500);
+
+    var res1 = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: sysPrompt,
+        messages: [{ role: "user", content: userMsg }]
+      })
+    });
+    if (!res1.ok) throw new Error("Erreur API analyse: " + res1.status);
+    var data1 = await res1.json();
+    var analyseHtml = (data1.content && data1.content[0] && data11.content[0].text) || "<p>Analyse non disponible.</p>";
+
+    sp(45, "Recherche d'un concurrent proche...");
+    await delay(300);
+
+    var concurrentData = null;
+    var concurrentAnalyseHtml = "";
+
+    try {
+      var lat = p.lat || p.latitude;
+      var lng = p.lng || p.longitude;
+      var cat = p.category || "restaurant";
+
+      if (lat && lng) {
+        var nearbyUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json";
+        nearbyUrl += "?location=" + lat + "," + lng;
+        nearbyUrl += "&radius=1000&type=" + encodeURIComponent(cat);
+        nearbyUrl += "&language=fr&key=" + MAPS_KEY;
+
+        var rNearby = await fetch(PROXY + encodeURIComponent(nearbyUrl));
+        var dNearby = await rNearby.json();
+        var candidates = (dNearby.results || []).filter(function(r) {
+          return r.place_id !== p.place_id && r.user_ratings_total > (p.review_count || 0);
+        });
+
+        if (candidates.length > 0) {
+          candidates.sort(function(a, b) { return (b.user_ratings_total || 0) - (a.user_ratings_total || 0); });
+          var best = candidates[0];
+          concurrentData = {
+            name: best.name,
+            rating: best.rating || 0,
+            review_count: best.user_ratings_total || 0,
+            address: best.vicinity || "",
+            place_id: best.place_id
+          };
+        }
+      }
+    } catch(eNearby) {
+      console.warn("Recherche concurrent echouee:", eNearby.message);
+    }
+
+    sp(60, "Audit du concurrent en cours...");
+    await delay(300);
+
+    if (concurrentData && concurrentData.place_id) {
+      try {
+        var detUrl = "https://maps.googleapis.com/maps/api/place/details/json";
+        detUrl += "?place_id=" + concurrentData.place_id;
+        detUrl += "&fields=name,rating,user_ratings_total,formatted_phone_number,website,photos,opening_hours,types,formatted_address";
+        detUrl += "&language=fr&key=" + MAPS_KEY;
+
+        var rDet = await fetch(PROXY + encodeURIComponent(detUrl));
+        var dDet = await rDet.json();
+        var det = dDet.result || {};
+
+        var cScore = 0;
+        if (det.rating && det.rating >= 4.5) cScore += 20;
+        else if (det.rating && det.rating >= 4.0) cScore += 15;
+        else if (det.rating && det.rating >= 3.5) cScore += 8;
+        if (det.user_ratings_total >= 100) cScore += 20;
+        else if (det.user_ratings_total >= 50) cScore += 12;
+        else if (det.user_ratings_total >= 20) cScore += 6;
+        if (det.photos && det.photos.length >= 10) cScore += 15;
+        else if (det.photos && det.photos.length >= 5) cScore += 8;
+        if (det.opening_hours && det.opening_hours.weekday_text) cScore += 10;
+        if (det.website) cScore += 10;
+        if (det.formatted_phone_number) cScore += 10;
+        if (det.types && det.types.length > 1) cScore += 10;
+        if (det.opening_hours && det.opening_hours.open_now !== undefined) cScore += 5;
+
+        concurrentData.score = cScore;
+        concurrentData.website = det.website || null;
+        concurrentData.phone = det.formatted_phone_number || null;
+        concurrentData.photos_count = det.photos ? det.photos.length : 0;
+        concurrentData.has_hours = !!(det.opening_hours && det.opening_hours.weekday_text);
+
+        sp(72, "Analyse comparative avec le concurrent...");
+
+        var sysComp = "Tu es expert GMB. Compare deux commerces concurrents et identifie les avantages du concurrent. ";
+        sysComp += "Genere en HTML simple (sans html/head/body). ";
+        sysComp += "Structure : <h3>Ce que fait mieux le concurrent</h3> (liste precise avec chiffres), ";
+        sysComp += "<h3>Ecarts de performance</h3> (tableau comparatif en mots), ";
+        sysComp += "<h3>Actions urgentes pour rattraper</h3> (3 actions concretes). ";
+        sysComp += "Sois factuel, chiffres a l'appui, en francais.";
+
+        var msgComp = "PHOSPECT {" + p.name + " :\n";
+        msgComp += "- Note : " + (p.rating || "?") + "/5\n";
+        msgComp += "- Avis : " + (p.review_count || 0) + "\n";
+        msgComp += "- Score GMB : " + auditScore + "/100\n\n";
+        msgComp += "CONCURRENT - " + concurrentData.name + " :\n";
+        msgComp += "- Note : " + concurrentData.rating + "/5\n";
+        msgComp += "- Avis : " + concurrentData.review_count + "\n";
+        msgComp += "- Score GMB estime : " + cScore + "/100\n";
+        msgComp += "- Site web : " + (concurrentData.website ? "OUI" : "NON") + "\n";
+        msgComp += "- Photos : " + concurrentData.photos_count + "\n";
+        msgComp += "- Horaires renseignes : " + (concurrentData.has_hours ? "OUI" : "NON");
+        msgComp += "\n\nIdentifie precisement sur quels points le concurrent performe mieux.";
+
+        var res2 = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 800,
+            system: sysComp,
+            messages: [{ role: "user", content: msgComp }]
+          })
+        });
+        if (res2.ok) {
+          var data2 = await res2.json();
+          concurrentAnalyseHtml = (data2.content && data2.content[0] && data2.content[0].text) || "";
+        }
+      } catch(eDet) {
+        console.warn("Audit concurrent echoue:", eDet.message);
+      }
+    }
+
+    sp(85, "Generation du document PDF...");
+    await delay(400);
+
+    var dateStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+    var scoreNum = parseInt(auditScore) || 0;
+    var scoreColor = scoreNum >= 70 ? "#22c55e" : scoreNum >= 50 ? "#f59e0b" : "#ef4444";
+
+    var css = "";
+    css += "* { margin:0; padding:0; box-sizing:border-box; }";
+    css += "body { font-family: Arial, sans-serif; color: #1e293b; background: #fff; }";
+    css += ".cover { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); color: #fff; padding: 52px; }";
+    css += ".cover-logo { font-size: 11px; font-weight: 700; letter-spacing: 3px; color: #22d3ee; text-transform: uppercase; margin-bottom: 32px; }";
+    css += ".cover h1 { font-size: 26px; font-weight: 700; margin-bottom: 6px; line-height: 1.3; }";
+    css += ".cover .sub { font-size: 14px; color: #94a3b8; margin-bottom: 28px; }";
+    css += ".meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 24px; }";
+    css += ".mi { background: rgba(255,255,255,0.1); padding: 14px 20px; border-radius: 10px; min-width: 90px; }";
+    css += ".mi .v { font-size: 22px; font-weight: 700; color: #22d3ee; }";
+    css += ".mi .k { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }";
+    css += ".body { padding: 40px 52px; }";
+    css += ".section { margin-bottom: 24px; padding: 22px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }";
+    css += ".section.warn { border-left: 4px solid #ef4444; }";
+    css += ".section.ok { border-left: 4px solid #22c55e; }";
+    css += ".section.info { border-left: 4px solid #22d3ee; }";
+    css += ".section.comp { border-left: 4px solid #f59e0b; background: #fffbeb; }";
+    css += ".stitle { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; }";
+    css += ".rc h3 { font-size: 15px; color: #1e40af; margin: 14px 0 8px; font-weight: 600; }";
+    css += ".rc p { font-size: 13px; line-height: 1.75; color: #475569; margin-bottom: 8px; }";
+    css += ".rc ul { padding-left: 20px; margin-bottom: 10px; }";
+    css += ".rc li { font-size: 13px; line-height: 1.8; color: #475569; }";
+    css += ".rc strong { color: #dc2626; }";
+    css += ".comp-box { display: flex; gap: 16px; margin: 12px 0; flex-wrap: wrap; }";
+    css += ".comp-card { flex: 1; min-width: 200px; padding: 16px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; }";
+    css += ".comp-card.loser { border-color: #fca5a5; background: #fff5f5; }";
+    css += ".comp-card.winner { border-color: #86efac; background: #f0fdf4; }";
+    css += ".comp-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 10px; }";
+    css += ".comp-card .stat { font-size: 12px; color: #64748b; margin: 4px 0; }";
+    css += ".comp-card .stat strong { color: #1e293b; }";
+    css += ".badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }";
+    css += ".badge-red { background: #fee2e2; color: #dc2626; }";
+    css += ".badge-green { background: #dcfce7; color: #16a34a; }";
+    css += ".badge-yellow { background: #fef3c7; color: #d97706; }";
+    css += ".footer { background: #f8fafc; padding: 18px 52px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #94a3b8; }";
+    css += ".footer strong { color: #22d3ee; }";
+    css += "@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .cover { -webkit-print-color-adjust: exact; } }";
+
+    var badgeClass = scoreNum >= 70 ? "badge-green" : scoreNum >= 50 ? "badge-yellow" : "badge-red";
+    var badgeLabel = scoreNum >= 70 ? "BON" : scoreNum >= 50 ? "MOYEN" : "FAIBLE";
+
+    var doc = "<!DOCTYPE html><html lang='fr'><head><meta charset='UTF-8'>";
+    doc += "<title>Rapport GMB - " + p.name + "</title>";
+    doc += "<style>" + css + "</style></head><body>";
+
+    doc += "<div class='cover'>";
+    doc += "<div class='cover-logo'>LOCAL SCAN - Rapport d'audit GMB</div>";
+    doc += "<h1>Audit de visibilite Google<br>" + p.name + "</h1>";
+    doc += "<div class='sub'>Rapport genere le " + dateStr + " - " + (p.address || p.category || "") + "</div>";
+    doc += "<div class='meta'>";
+    doc += "<div class='mi'><div class='v'>" + auditScore + "</div><div class='k'>Score GMB</div></div>";
+    doc += "<div class='mi'><div class='v'>" + (p.rating || "-") + "/5</div><div class='k'>Note Google</div></div>";
+    doc += "<div class='mi'><div class='v'>" + (p.review_count || 0) + "</div><div class='k'>Avis</div></div>";
+    doc += "<div class='mi'><div class='v'>" + (p.category || "N/A") + "</div><div class='k'>Categorie</div></div>";
+    if (concurrentData) {
+      doc += "<div class='mi' style='background:rgba(245,158,11,0.15)'><div class='v' style='color:#f59e0b'>" + concurrentData.score + "/100</div><div class='k'>Concurrent</div></div>";
+    }
+    doc += "</div></div>";
+
+    doc += "<div class='body'>";
+    doc += "<div class='section info'><div class='stitle'>Analyse IA et Recommandations</div><div class='rc'>" + analyseHtml + "</div></div>";
+
+    if (concurrentData) {
+      doc += "<div class='section comp'><div class='stitle'>Analyse concurrentielle - Votre concurrent fait mieux</div>";
+      doc += "<div class='comp-box'>";
+      doc += "<div class='comp-card loser'><h4>" + p.name + " <span class='badge " + badgeClass + "'>" + badgeLabel + " - " + auditScore + "/100</span></h4>";
+      doc += "<div class='stat'>Note : <strong>" + (p.rating || "?") + "/5</strong></div>";
+      doc += "<div class='stat'>Avis : <strong>" + (p.review_count || 0) + "</strong></div>";
+      doc += "<div class='stat'>Site web : <strong>" + (p.website ? "Oui" : "Non") + "</strong></div></div>";
+      doc += "<div class='comp-card winner'><h4>" + concurrentData.name + " <span class='badge badge-green'>DEVANT - " + concurrentData.score + "/100</span></h4>";
+      doc += "<div class='stat'>Note : <strong>" + concurrentData.rating + "/5</strong></div>";
+      doc += "<div class='stat'>Avis : <strong>" + concurrentData.review_count + "</strong></div>";
+      doc += "<div class='stat'>Photos : <strong>" + concurrentData.photos_count + "</strong></div>";
+      doc += "<div class='stat'>Site web : <strong>" + (concurrentData.website ? "Oui" : "Non") + "</strong></div></div>";
+      doc += "</div>";
+      if (concurrentAnalyseHtml) {
+        doc += "<div class='rc' style='margin-top:14px'>" + concurrentAnalyseHtml + "</div>";
+      }
+      doc += "</div>";
+    }
+
+    doc += "<div class='section'><div class='stitle'>Detail des 14 criteres GMB audites</div>" + ac.innerHTML + "</div>";
+
+    doc += "<div class='section ok'><div class='stitle'>Informations de contact</div>";
+    if (p.phone) doc += "<p>Tel: <strong>" + p.phone + "</strong></p>";
+    if (p.email) doc += "<p>Email: <strong>" + p.email + "</strong></p>";
+    if (p.website) doc += "<p>Site: <strong>" + p.website + "</strong></p>";
+    if (p.address) doc += "<p>Adresse: <strong>" + p.address + "</strong></p>";
+    doc += "</div>";
+
+    doc += "</div>";
+    doc += "<div class='footer'><span>Rapport genere par <strong>Local ScanM/strong></span><span>" + dateStr + " - Confidentiel</span></div>";
+    doc += "</body></html>";
+
+    sp(95, "Telechargement...");
+    await delay(300);
+    var blob = new Blob([doc], { type: "text/html;charset=utf-8" });
+    var burl = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = burl;
+    a.download = "rapport-gmb-" + p.name.replace(/[^a-z0-9]/gi, "-").toLowerCase() + ".html";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(burl);
+    sp(100, "Rapport telecharge ! Ouvrez dans Chrome puis Ctrl+P pour PDF.");
+    setTimeout(function() { var b = document.getElementById("rpt-bar"); if (b) b.remove(); }, 7000);
+  } catch(err) {
+    sp(0, "Erreur: " + err.message);
+    console.error("genAuditReport:", err);
+  }
 }
+
 async function genDescImprovement(prospectId){
   const p=allProspects.find(x=>x.id===prospectId);
   const prompt="Description Google My Business pour \""+p.name+"\" a Angers. 250 chars max, mots-cles locaux. 2 versions.";
