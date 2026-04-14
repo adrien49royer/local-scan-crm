@@ -915,7 +915,7 @@ function showAuditModal(res){
     html+="</div>";
   });
   html+="<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:.5rem\">";
-  html+="<button class=\"btn btn-sm btn-accent\" onclick=\"genAuditReport('"+p.id+"')\" >📄 Générer rapport PDF</button>";
+  html+="<button class=\"btn btn-sm btn-accent\" onclick=\"genAuditReport('"+p.id+"')\" >Générer rapport PDF</button>";
   html+="<button class=\"btn btn-sm\" onclick=\"genDescImprovement('"+p.id+"')\">Ameliorer description</button></div>";
   document.getElementById("audit-modal-body").innerHTML=html;
   document.getElementById("modal-audit").classList.add("opeasync function genAuditReport(prospectId) {
